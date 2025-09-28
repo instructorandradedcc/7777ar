@@ -156,7 +156,6 @@
             assets: [],
         };
         
-        // CORRECCIÓN: Usar la URL base de GitHub para cargar los assets correctamente.
         const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/';
         const MARKERS_URL = `${GITHUB_BASE_URL}markers/`;
         const MODELS_URL = `${GITHUB_BASE_URL}modelss/`;
@@ -173,7 +172,6 @@
 
         state.assets = ASSETS_CONFIG.map((config, index) => ({
             id: index,
-            // CORRECCIÓN: Construir la URL completa para cada asset.
             markerUrl: `${MARKERS_URL}${config.name}.mind`,
             modelUrl: `${MODELS_URL}${config.name}.glb`,
             transform: config
@@ -200,7 +198,8 @@
             
             const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
             
-            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: true; uiLoading: yes; uiError: no; uiScanning: no;`); // uiError: no para manejarlo manualmente
+            // SOLUCIÓN: Cambiar autoStart a 'false' para iniciar la cámara manualmente.
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: yes; uiError: no; uiScanning: no;`);
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights: true');
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
@@ -238,6 +237,12 @@
                 sceneEl.appendChild(targetEl);
             });
 
+            // SOLUCIÓN: Añadir un listener que espera a que la escena se cargue para iniciar la cámara.
+            // Esto asegura que la solicitud de permiso esté directamente vinculada a la acción del usuario.
+            sceneEl.addEventListener('loaded', () => {
+                sceneEl.systems['mindar-image'].start();
+            });
+
             sceneEl.addEventListener('arReady', () => {
                 arActiveControls.classList.remove('hidden');
                 state.isArActive = true;
@@ -245,7 +250,6 @@
 
             sceneEl.addEventListener('arError', (event) => {
                 console.error("Error al iniciar MindAR:", event.detail);
-                // MEJORA: Mostrar pantalla de error en lugar de 'alert'.
                 let message = "No se pudo iniciar la cámara. Por favor, asegúrate de haberle dado permisos y vuelve a intentarlo.";
                 if (event.detail && event.detail.name === 'NotFoundError') {
                     message = "No se encontró una cámara compatible en tu dispositivo.";
@@ -262,16 +266,13 @@
         function stopAR() {
             const sceneEl = arSceneContainer.querySelector('a-scene');
             if (sceneEl) {
-                // Detener el sistema MindAR para liberar la cámara
                 if (sceneEl.systems['mindar-image']) {
                     sceneEl.systems['mindar-image'].stop();
                 }
-                // Eliminar la escena del DOM
                 if (sceneEl.parentNode) {
                     sceneEl.parentNode.removeChild(sceneEl);
                 }
             }
-            // Limpiar el contenedor por si acaso
             arSceneContainer.innerHTML = '';
             
             welcomeScreen.classList.remove('opacity-0', 'pointer-events-none');
