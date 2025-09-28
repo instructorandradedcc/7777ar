@@ -25,6 +25,21 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* Estilos para la interfaz de escaneo de MindAR */
+        #scanning-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            z-index: 10000;
+        }
     </style>
 </head>
 <body class="bg-gray-900 overflow-hidden">
@@ -38,6 +53,7 @@
             <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
             Iniciar Experiencia
         </button>
+        <!-- Este contenedor de estado ya no es necesario, MindAR lo gestionará -->
         <div id="ar-status" class="text-center font-mono p-2 bg-black bg-opacity-25 rounded mt-8 flex justify-center items-center gap-2 hidden min-w-[200px]">
             <div id="loader" class="loader"></div>
             <span id="ar-status-text"></span>
@@ -47,6 +63,11 @@
     <!-- Contenedor para la Escena AR -->
     <div id="ar-scene-container" class="fixed inset-0 z-10"></div>
     
+    <!-- Elemento para la UI de escaneo de MindAR -->
+    <div id="scanning-overlay" class="hidden">
+        <div>Escaneando...</div>
+    </div>
+
     <!-- Controles cuando la AR está activa -->
     <div id="ar-active-controls" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-20">
          <button id="stop-ar-btn" class="bg-red-500 text-white font-bold py-3 px-6 rounded-full hover:bg-red-600 transition duration-300 shadow-xl">Detener Cámara</button>
@@ -137,10 +158,8 @@
         const state = {
             isArActive: false,
             assets: [],
-            localAssetUrls: [], // Almacenará las URLs locales temporales
         };
 
-        // CORRECCIÓN: Apuntar a las carpetas correctas dentro de 'asetss'
         const LOCAL_MARKERS_URL = './asetss/markers/';
         const LOCAL_MODELS_URL = './asetss/modelss/';
 
@@ -155,9 +174,8 @@
 
         state.assets = ASSETS_CONFIG.map((config, index) => ({
             id: index,
-            // CORRECCIÓN: Usar rutas locales correctas
-            remoteMarkerUrl: `${LOCAL_MARKERS_URL}${config.name}.mind`,
-            remoteModelUrl: `${LOCAL_MODELS_URL}${config.name}.glb`,
+            markerUrl: `${LOCAL_MARKERS_URL}${config.name}.mind`,
+            modelUrl: `${LOCAL_MODELS_URL}${config.name}.glb`,
             transform: config
         }));
         
@@ -167,72 +185,29 @@
         const welcomeScreen = document.getElementById('welcome-screen');
         const arSceneContainer = document.getElementById('ar-scene-container');
         const arActiveControls = document.getElementById('ar-active-controls');
-        const arStatusContainer = document.getElementById('ar-status');
-        const arStatusText = document.getElementById('ar-status-text');
-        const loader = document.getElementById('loader');
+        const scanningOverlay = document.getElementById('scanning-overlay');
 
         // --- FUNCIONES DE LA APLICACIÓN ---
         
-        async function fetchAssetsAndStartAR() {
+        function startAR() {
             startBtn.disabled = true;
-            arStatusContainer.classList.remove('hidden');
-            loader.classList.remove('hidden');
-
-            try {
-                // Paso 1: "Descargar" (cargar) todos los archivos desde las rutas locales
-                arStatusText.textContent = 'Cargando recursos...';
-                const promises = state.assets.map(async (asset) => {
-                    console.log(`Cargando: ${asset.remoteMarkerUrl}`);
-                    const markerResponse = await fetch(asset.remoteMarkerUrl);
-                     if (!markerResponse.ok) {
-                        throw new Error(`Fallo al cargar MARCADOR para ${asset.transform.name} (estado: ${markerResponse.status})`);
-                    }
-                    console.log(`Cargando: ${asset.remoteModelUrl}`);
-                    const modelResponse = await fetch(asset.remoteModelUrl);
-                    if (!modelResponse.ok) {
-                        throw new Error(`Fallo al cargar MODELO para ${asset.transform.name} (estado: ${modelResponse.status})`);
-                    }
-
-                    const markerBlob = await markerResponse.blob();
-                    const modelBlob = await modelResponse.blob();
-                    
-                    // Paso 2: Crear URLs locales temporales para la escena
-                    return {
-                        ...asset,
-                        localMarkerUrl: URL.createObjectURL(markerBlob),
-                        localModelUrl: URL.createObjectURL(modelBlob),
-                    };
-                });
-                
-                state.localAssetUrls = await Promise.all(promises);
-
-                // Paso 3: Iniciar la escena AR con los archivos locales
-                arStatusText.textContent = 'Iniciando AR...';
-                buildAndStartARScene();
-
-            } catch (error) {
-                console.error("Error al cargar assets:", error);
-                arStatusText.textContent = error.message || 'Error al cargar recursos.';
-                loader.classList.add('hidden');
-                startBtn.disabled = false;
-            }
-        }
-
-        function buildAndStartARScene() {
+            
             const sceneEl = document.createElement('a-scene');
             
-            const markerUrlList = state.localAssetUrls.map(asset => asset.localMarkerUrl).join(';');
-            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`);
+            const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
+            
+            // Usamos la UI de carga y escaneo de MindAR para mayor estabilidad
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: true; uiLoading: yes; uiError: yes; uiScanning: #scanning-overlay;`);
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights: true');
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
 
             const assetsEl = document.createElement('a-assets');
-            state.localAssetUrls.forEach(asset => {
+            state.assets.forEach(asset => {
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.setAttribute('id', `model-${asset.id}`);
-                assetItem.setAttribute('src', asset.localModelUrl);
+                assetItem.setAttribute('src', asset.modelUrl); // Usamos la ruta relativa directamente
                 assetsEl.appendChild(assetItem);
             });
             sceneEl.appendChild(assetsEl);
@@ -242,7 +217,7 @@
             cameraEl.setAttribute('look-controls', 'enabled: false');
             sceneEl.appendChild(cameraEl);
 
-            state.localAssetUrls.forEach((asset, index) => {
+            state.assets.forEach((asset, index) => {
                 const targetEl = document.createElement('a-entity');
                 targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
                 targetEl.setAttribute('target-interaction', '');
@@ -259,48 +234,38 @@
                 sceneEl.appendChild(targetEl);
             });
 
-            arSceneContainer.appendChild(sceneEl);
-
             sceneEl.addEventListener('arReady', () => {
-                const mindarSystem = sceneEl.systems['mindar-image'];
-                if (mindarSystem) {
-                    mindarSystem.start();
-                    welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-                    arActiveControls.classList.remove('hidden');
-                    state.isArActive = true;
-                }
+                welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+                arActiveControls.classList.remove('hidden');
+                state.isArActive = true;
             });
 
             sceneEl.addEventListener('arError', (event) => {
-                console.error("MindAR initialization error:", event.detail);
-                arStatusText.textContent = 'Error: No se pudo iniciar la AR.';
-                loader.classList.add('hidden');
+                console.error("Error al iniciar MindAR:", event.detail);
+                // Aquí podrías mostrar un mensaje de error al usuario
             });
+
+            arSceneContainer.appendChild(sceneEl);
         }
 
         function stopAR() {
             const sceneEl = arSceneContainer.querySelector('a-scene');
-            if (sceneEl && sceneEl.systems['mindar-image']) {
-                sceneEl.systems['mindar-image'].stop();
+            if (sceneEl) {
+                if (sceneEl.systems['mindar-image']) {
+                    sceneEl.systems['mindar-image'].stop();
+                }
+                sceneEl.parentNode.removeChild(sceneEl);
             }
             arSceneContainer.innerHTML = '';
-            
-            // Liberar memoria de las URLs locales
-            state.localAssetUrls.forEach(asset => {
-                URL.revokeObjectURL(asset.localMarkerUrl);
-                URL.revokeObjectURL(asset.localModelUrl);
-            });
-            state.localAssetUrls = [];
             
             welcomeScreen.classList.remove('opacity-0', 'pointer-events-none');
             arActiveControls.classList.add('hidden');
             startBtn.disabled = false;
-            arStatusContainer.classList.add('hidden');
             state.isArActive = false;
         }
 
         // --- EVENT LISTENERS ---
-        startBtn.addEventListener('click', fetchAssetsAndStartAR);
+        startBtn.addEventListener('click', startAR);
         stopBtn.addEventListener('click', stopAR);
     });
     </script>
