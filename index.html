@@ -145,10 +145,10 @@
         const closeErrorBtn = document.getElementById('close-error-btn');
 
         let areAssetsLoaded = false;
-        let isSceneReady = false;
+        let isMindARReady = false;
 
         function checkIfReady() {
-            if (areAssetsLoaded && isSceneReady) {
+            if (areAssetsLoaded && isMindARReady) {
                 console.log("Todos los recursos Y la escena están listos.");
                 startBtn.disabled = false;
                 startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
@@ -160,9 +160,8 @@
             }
         }
 
-        async function setupARScene() {
+        async function configureMindAR() {
             try {
-                // SOLUCIÓN: Descargar marcadores como blobs para crear URLs seguras
                 console.log("Descargando marcadores para crear URLs seguras...");
                 const markerBlobUrls = await Promise.all(
                     state.assets.map(async (asset) => {
@@ -178,51 +177,62 @@
                 const mindarImageProps = `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
                 arSceneEl.setAttribute('mindar-image', mindarImageProps);
                 
-                state.assets.forEach(asset => {
-                    const assetItem = document.createElement('a-asset-item');
-                    assetItem.setAttribute('id', `model-${asset.id}`);
-                    assetItem.setAttribute('src', asset.modelUrl);
-                    arAssetsEl.appendChild(assetItem);
-                });
-                
-                state.assets.forEach((asset, index) => {
-                    const targetEl = document.createElement('a-entity');
-                    targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
-                    targetEl.setAttribute('target-interaction', '');
-                    const t = asset.transform;
-                    const modelEntity = document.createElement('a-gltf-model');
-                    modelEntity.setAttribute('src', `#model-${asset.id}`);
-                    modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
-                    modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
-                    modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
-                    modelEntity.setAttribute('animation-mixer', '');
-                    targetEl.appendChild(modelEntity);
-                    arSceneEl.appendChild(targetEl);
-                });
-
-                arSceneEl.addEventListener('arReady', () => {
-                    loadingScreen.classList.add('hidden');
-                    arActiveControls.classList.remove('hidden');
-                    state.isArActive = true;
-                });
-                arSceneEl.addEventListener('arError', (event) => {
-                    console.error("Error al iniciar MindAR:", event.detail);
-                    let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos y vuelve a intentarlo.";
-                    if (event.detail?.name === 'NotFoundError') { message = "No se encontró una cámara compatible en tu dispositivo."; }
-                    if (event.detail?.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en tu navegador."; }
-                    showError(message);
-                    stopAR();
-                });
-
-                arSceneEl.addEventListener('loaded', () => {
-                    console.log("La escena A-Frame ha sido cargada.");
-                    isSceneReady = true;
-                    checkIfReady();
-                });
+                isMindARReady = true;
+                checkIfReady();
 
             } catch (err) {
-                console.error("Fallo en la configuración de la escena AR:", err);
+                console.error("Fallo en la configuración de MindAR:", err);
                 showError("Error al preparar los marcadores AR. Revisa tu conexión o los archivos.");
+            }
+        }
+
+        function setupSceneContent() {
+            state.assets.forEach(asset => {
+                const assetItem = document.createElement('a-asset-item');
+                assetItem.setAttribute('id', `model-${asset.id}`);
+                assetItem.setAttribute('src', asset.modelUrl);
+                arAssetsEl.appendChild(assetItem);
+            });
+            
+            state.assets.forEach((asset, index) => {
+                const targetEl = document.createElement('a-entity');
+                targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
+                targetEl.setAttribute('target-interaction', '');
+                const t = asset.transform;
+                const modelEntity = document.createElement('a-gltf-model');
+                modelEntity.setAttribute('src', `#model-${asset.id}`);
+                modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
+                modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
+                modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
+                modelEntity.setAttribute('animation-mixer', '');
+                targetEl.appendChild(modelEntity);
+                arSceneEl.appendChild(targetEl);
+            });
+
+            arSceneEl.addEventListener('arReady', () => {
+                loadingScreen.classList.add('hidden');
+                arActiveControls.classList.remove('hidden');
+                state.isArActive = true;
+            });
+
+            arSceneEl.addEventListener('arError', (event) => {
+                console.error("Error al iniciar MindAR:", event.detail);
+                let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos y vuelve a intentarlo.";
+                if (event.detail?.name === 'NotFoundError') { message = "No se encontró una cámara compatible en tu dispositivo."; }
+                if (event.detail?.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en tu navegador."; }
+                showError(message);
+                stopAR();
+            });
+
+            // SOLUCIÓN: Esperar a que la escena esté cargada para configurar MindAR
+            if (arSceneEl.hasLoaded) {
+                console.log("La escena A-Frame ya estaba cargada.");
+                configureMindAR();
+            } else {
+                arSceneEl.addEventListener('loaded', () => {
+                    console.log("La escena A-Frame ha sido cargada y está lista.");
+                    configureMindAR();
+                });
             }
         }
         
@@ -249,7 +259,7 @@
         function stopAR() {
             if (state.isArActive) {
                 const mindarSystem = arSceneEl.systems['mindar-image'];
-                if (mindarSystem) { mindarSystem.stop(); }
+                if (mindarSystem && mindarSystem.isScanning) { mindarSystem.stop(); }
             }
             arSceneEl.style.display = 'none';
             loadingScreen.classList.add('hidden');
@@ -257,7 +267,7 @@
             arActiveControls.classList.add('hidden');
             state.isArActive = false;
             
-            if (areAssetsLoaded && isSceneReady) {
+            if (areAssetsLoaded && isMindARReady) {
                 startBtn.disabled = false;
                 checkIfReady();
             }
@@ -275,7 +285,7 @@
         }
         
         arAssetsEl.addEventListener('loaded', () => {
-            console.log("Todos los recursos AR han sido cargados.");
+            console.log("Todos los recursos AR (modelos) han sido cargados.");
             areAssetsLoaded = true;
             checkIfReady();
         });
@@ -284,7 +294,10 @@
             showError("La carga de los modelos 3D tardó demasiado. Revisa tu conexión a internet e inténtalo de nuevo.");
         });
 
-        setupARScene();
+        // Iniciar la configuración
+        setupSceneContent();
+        
+        // Listeners de botones
         startBtn.addEventListener('click', startAR);
         stopBtn.addEventListener('click', stopAR);
         closeErrorBtn.addEventListener('click', hideError);
@@ -292,6 +305,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
