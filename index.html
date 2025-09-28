@@ -60,29 +60,15 @@
         <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
         <h1 class="text-4xl font-bold mb-2">Ecobook</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
-        <button id="start-ar-btn" class="bg-green-500 text-white font-bold py-3 px-8 rounded-full hover:bg-green-600 transition duration-300 shadow-xl text-lg flex items-center disabled:bg-gray-400">
+        <button id="start-ar-btn" class="bg-green-500 text-white font-bold py-3 px-8 rounded-full hover:bg-green-600 transition duration-300 shadow-xl text-lg flex items-center">
             <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
             Iniciar Experiencia
         </button>
     </div>
 
-    <!-- Contenedor para la Escena AR -->
-    <div id="ar-scene-container" class="fixed inset-0 z-10" style="display: none;">
-        <!-- La escena AR ahora está predefinida en el HTML para mayor estabilidad -->
-        <a-scene id="ar-scene" embedded vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" renderer="colorManagement: true, physicallyCorrectLights: true">
-            <!-- Los assets se cargan aquí -->
-            <a-assets id="ar-assets"></a-assets>
-            <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-            <!-- Las entidades de los marcadores se añadirán aquí con JS -->
-        </a-scene>
-    </div>
+    <!-- Contenedor para la Escena AR (inicialmente vacío) -->
+    <div id="ar-scene-container" class="fixed inset-0 z-10"></div>
     
-    <!-- Elemento para la UI de escaneo de MindAR -->
-    <div id="scanning-overlay" class="hidden">
-        <div class="scanning-box"></div>
-        <div class="scanning-text">Buscando marcador...</div>
-    </div>
-
     <!-- Controles cuando la AR está activa -->
     <div id="ar-active-controls" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-20">
          <button id="stop-ar-btn" class="bg-red-500 text-white font-bold py-3 px-6 rounded-full hover:bg-red-600 transition duration-300 shadow-xl">Detener Cámara</button>
@@ -200,26 +186,37 @@
         const welcomeScreen = document.getElementById('welcome-screen');
         const arSceneContainer = document.getElementById('ar-scene-container');
         const arActiveControls = document.getElementById('ar-active-controls');
-        const sceneEl = document.getElementById('ar-scene');
-        const assetsEl = document.getElementById('ar-assets');
 
         // --- FUNCIONES DE LA APLICACIÓN ---
         
-        function setupARScene() {
+        function startAR() {
+            startBtn.disabled = true;
+            
+            const sceneEl = document.createElement('a-scene');
+            
             const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
-            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: yes; uiError: yes; uiScanning: #scanning-overlay;`);
+            
+            // CORRECCIÓN: Se cambia uiScanning a "no" para ocultar el recuadro blanco
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: true; uiLoading: yes; uiError: yes; uiScanning: no;`);
+            sceneEl.setAttribute('color-space', 'sRGB');
+            sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights: true');
+            sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+            sceneEl.setAttribute('embedded', ''); // Importante para la gestión de la UI
 
-            // Limpia assets y entidades previas por si acaso
-            assetsEl.innerHTML = '';
-            const existingEntities = sceneEl.querySelectorAll('[mindar-image-target]');
-            existingEntities.forEach(e => e.parentNode.removeChild(e));
-
+            const assetsEl = document.createElement('a-assets');
             state.assets.forEach(asset => {
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.setAttribute('id', `model-${asset.id}`);
                 assetItem.setAttribute('src', asset.modelUrl);
                 assetsEl.appendChild(assetItem);
             });
+            sceneEl.appendChild(assetsEl);
+
+            const cameraEl = document.createElement('a-camera');
+            cameraEl.setAttribute('position', '0 0 0');
+            cameraEl.setAttribute('look-controls', 'enabled: false');
+            sceneEl.appendChild(cameraEl);
 
             state.assets.forEach((asset, index) => {
                 const targetEl = document.createElement('a-entity');
@@ -237,30 +234,34 @@
                 targetEl.appendChild(modelEntity);
                 sceneEl.appendChild(targetEl);
             });
-        }
-        
-        function startAR() {
-            startBtn.disabled = true;
-            
-            welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-            arSceneContainer.style.display = 'block';
-            arActiveControls.classList.remove('hidden');
 
-            const mindarSystem = sceneEl.systems['mindar-image'];
-            if (mindarSystem) {
-                mindarSystem.start();
+            sceneEl.addEventListener('arReady', () => {
+                // La escena ya está iniciada por autoStart, solo gestionamos la UI
+                welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+                arActiveControls.classList.remove('hidden');
                 state.isArActive = true;
-            } else {
-                 console.error("MindAR system not found. Scene might not be initialized.");
-            }
+            });
+
+            sceneEl.addEventListener('arError', (event) => {
+                console.error("Error al iniciar MindAR:", event.detail);
+                stopAR();
+                alert("Hubo un error al iniciar la cámara. Por favor, asegúrate de haberle dado permisos y vuelve a intentarlo.");
+            });
+
+            arSceneContainer.appendChild(sceneEl);
         }
 
         function stopAR() {
-            if (sceneEl && sceneEl.systems['mindar-image']) {
-                sceneEl.systems['mindar-image'].stop();
+            const sceneEl = arSceneContainer.querySelector('a-scene');
+            if (sceneEl) {
+                if (sceneEl.systems['mindar-image']) {
+                    sceneEl.systems['mindar-image'].stop();
+                }
+                if (sceneEl.parentNode) {
+                    sceneEl.parentNode.removeChild(sceneEl);
+                }
             }
-            
-            arSceneContainer.style.display = 'none';
+            arSceneContainer.innerHTML = '';
             
             welcomeScreen.classList.remove('opacity-0', 'pointer-events-none');
             arActiveControls.classList.add('hidden');
@@ -268,14 +269,16 @@
             state.isArActive = false;
         }
 
-        // --- INICIALIZACIÓN Y EVENT LISTENERS ---
-        setupARScene(); // Prepara la escena en cuanto carga la página
+        // --- EVENT LISTENERS ---
         startBtn.addEventListener('click', startAR);
         stopBtn.addEventListener('click', stopAR);
     });
     </script>
 </body>
 </html>
+
+
+
 
 
 
