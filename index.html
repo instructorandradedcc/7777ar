@@ -136,95 +136,19 @@
         const errorMessage = document.getElementById('error-message');
         const closeErrorBtn = document.getElementById('close-error-btn');
 
-        // --- LÓGICA DE INICIALIZACIÓN ROBUSTA ---
-        async function initialize() {
-            try {
-                const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
-                arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false;`);
-
-                state.assets.forEach((asset, index) => {
-                    const assetItem = document.createElement('a-asset-item');
-                    assetItem.setAttribute('id', `model-${asset.id}`);
-                    assetItem.setAttribute('src', asset.modelUrl);
-                    arAssetsEl.appendChild(assetItem);
-
-                    const targetEl = document.createElement('a-entity');
-                    targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
-                    targetEl.setAttribute('target-interaction', '');
-                    
-                    const t = asset.transform;
-                    const modelEntity = document.createElement('a-gltf-model');
-                    modelEntity.setAttribute('src', `#model-${asset.id}`);
-                    modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
-                    modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
-                    modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
-                    modelEntity.setAttribute('animation-mixer', '');
-                    
-                    targetEl.appendChild(modelEntity);
-                    arSceneEl.appendChild(targetEl);
-                });
-
-                loadingDetails.textContent = 'Descargando recursos...';
-                await Promise.all([
-                    new Promise(resolve => arAssetsEl.addEventListener('loaded', resolve)),
-                    new Promise(resolve => arSceneEl.hasLoaded ? resolve() : arSceneEl.addEventListener('loaded', resolve))
-                ]);
-
-                // *** CAMBIO CLAVE: Esperar explícitamente a que el sistema MindAR se registre ***
-                loadingDetails.textContent = 'Inicializando sistema AR...';
-                await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => reject(new Error("El sistema MindAR tardó demasiado en inicializar.")), 10000);
-                    const checkInterval = setInterval(() => {
-                        if (arSceneEl.systems['mindar-image']) {
-                            clearInterval(checkInterval);
-                            clearTimeout(timeout);
-                            console.log("Sistema MindAR detectado y listo.");
-                            resolve();
-                        }
-                    }, 100);
-                });
-
-                loadingDetails.textContent = '¡Listo para empezar!';
-                startBtn.disabled = false;
-                startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
-                buttonSpinner.style.display = 'none';
-                buttonText.textContent = 'Iniciar Experiencia';
-
-            } catch (err) {
-                 console.error("Error grave en la inicialización:", err);
-                 showError(err.message || "No se pudieron cargar los recursos para la experiencia AR.");
-            }
+        // --- MANEJO DE ERRORES ---
+        function showError(message) {
+            loadingScreen.classList.add('hidden');
+            errorMessage.textContent = message;
+            errorScreen.classList.remove('hidden');
         }
 
-        // --- LÓGICA DE AR (INICIO/PARADA) ---
-        async function startAR() {
-            welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-            loadingScreen.classList.remove('hidden');
-            await new Promise(resolve => setTimeout(resolve, 100)); 
-
-            try {
-                const mindarSystem = arSceneEl.systems['mindar-image'];
-                if (!mindarSystem) {
-                    throw new Error("El sistema MindAR no fue encontrado. Intenta recargar la página.");
-                }
-                await mindarSystem.start(); 
-                
-                arSceneEl.style.display = 'block';
-                loadingScreen.classList.add('hidden');
-                arActiveControls.classList.remove('hidden');
-                state.isArActive = true;
-
-            } catch (err) {
-                console.error("Fallo al iniciar AR (solicitud de cámara):", err);
-                let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos.";
-                if (err.name === 'NotFoundError' || err.name === 'TrackStartError') { message = "No se encontró una cámara compatible en tu dispositivo."; }
-                if (err.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en la configuración de tu navegador y recarga la página."; }
-                showError(message);
-                stopAR();
-            }
+        function hideError() {
+            errorScreen.classList.add('hidden');
+            stopAR();
         }
-
+        
+        // --- LÓGICA DE AR (PARADA) ---
         function stopAR() {
             if (state.isArActive) {
                 const mindarSystem = arSceneEl.systems['mindar-image'];
@@ -238,26 +162,83 @@
             arActiveControls.classList.add('hidden');
             state.isArActive = false;
         }
-        
-        // --- MANEJO DE ERRORES ---
-        function showError(message) {
-            loadingScreen.classList.add('hidden');
-            errorMessage.textContent = message;
-            errorScreen.classList.remove('hidden');
-        }
 
-        function hideError() {
-            errorScreen.classList.add('hidden');
-            stopAR(); // Vuelve a la pantalla de inicio
-        }
+        // --- FUNCIÓN PRINCIPAL DE CONFIGURACIÓN ---
+        const setupARExperience = () => {
+            // 1. Configurar los marcadores y crear los elementos en el DOM
+            const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
+            arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false;`);
 
-        // --- EVENT LISTENERS ---
-        startBtn.addEventListener('click', startAR);
+            state.assets.forEach((asset, index) => {
+                const assetItem = document.createElement('a-asset-item');
+                assetItem.id = `model-${asset.id}`;
+                assetItem.src = asset.modelUrl;
+                arAssetsEl.appendChild(assetItem);
+
+                const targetEl = document.createElement('a-entity');
+                targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
+                targetEl.setAttribute('target-interaction', '');
+                
+                const t = asset.transform;
+                const modelEntity = document.createElement('a-gltf-model');
+                modelEntity.setAttribute('src', `#model-${asset.id}`);
+                modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
+                modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
+                modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
+                modelEntity.setAttribute('animation-mixer', '');
+                
+                targetEl.appendChild(modelEntity);
+                arSceneEl.appendChild(targetEl);
+            });
+
+            // 2. Esperar a que la escena de A-Frame esté completamente cargada
+            arSceneEl.addEventListener('loaded', () => {
+                const mindarSystem = arSceneEl.systems['mindar-image'];
+                
+                // Si el sistema no está listo, mostrar error.
+                if (!mindarSystem) {
+                    showError("El sistema de Realidad Aumentada no pudo inicializarse.");
+                    return;
+                }
+
+                // 3. Habilitar el botón de inicio
+                loadingDetails.textContent = '¡Listo para empezar!';
+                startBtn.disabled = false;
+                startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                buttonSpinner.style.display = 'none';
+                buttonText.textContent = 'Iniciar Experiencia';
+                
+                // 4. Asignar el evento click AHORA que sabemos que todo está listo
+                startBtn.addEventListener('click', async () => {
+                    welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+                    loadingScreen.classList.remove('hidden');
+
+                    try {
+                        // Llamar a start() es ahora seguro
+                        await mindarSystem.start();
+                        arSceneEl.style.display = 'block';
+                        arActiveControls.classList.remove('hidden');
+                        state.isArActive = true;
+                    } catch (err) {
+                        console.error("Fallo al iniciar AR (solicitud de cámara):", err);
+                        let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos.";
+                        if (err.name === 'NotFoundError' || err.name === 'TrackStartError') { message = "No se encontró una cámara compatible."; }
+                        if (err.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en tu navegador y recarga."; }
+                        showError(message);
+                    } finally {
+                        loadingScreen.classList.add('hidden');
+                    }
+                });
+            });
+        };
+
+        // --- EVENT LISTENERS GENERALES ---
         stopBtn.addEventListener('click', stopAR);
         closeErrorBtn.addEventListener('click', hideError);
 
-        // Iniciar el proceso de carga
-        initialize();
+        // Iniciar la configuración
+        setupARExperience();
     });
     </script>
 </body>
