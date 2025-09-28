@@ -37,7 +37,7 @@
         <h1 class="text-4xl font-bold mb-2">Ecobook AR</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
         
-        <!-- SOLUCIÓN: Botón con estado de carga claro -->
+        <!-- Botón con estado de carga claro -->
         <button id="start-ar-btn" class="bg-gray-400 text-white font-bold py-3 px-8 rounded-full shadow-xl text-lg flex items-center justify-center cursor-not-allowed" disabled>
             <span id="button-spinner" class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-3"></span>
             <span id="button-text">Cargando</span>
@@ -162,8 +162,15 @@
         }
 
         function setupARScene() {
+            // SOLUCIÓN: Se establece el atributo mindar-image con un objeto para evitar errores de parseo
             const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
-            arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`);
+            arSceneEl.setAttribute('mindar-image', {
+                imageTargetSrc: markerUrlList,
+                autoStart: false,
+                uiLoading: 'no',
+                uiError: 'no',
+                uiScanning: 'no'
+            });
             
             state.assets.forEach(asset => {
                 const assetItem = document.createElement('a-asset-item');
@@ -217,14 +224,14 @@
 
             try {
                 const mindarSystem = arSceneEl.systems['mindar-image'];
-                if (!mindarSystem) {
-                    throw new Error("El sistema MindAR no está disponible.");
+                if (!mindarSystem || typeof mindarSystem.start !== 'function') {
+                    throw new Error("El sistema MindAR no se inicializó correctamente. Por favor, refresca la página.");
                 }
                 await mindarSystem.start();
                 arSceneEl.style.display = 'block';
             } catch (err) {
                 console.error("Fallo al iniciar AR:", err);
-                showError("No se pudo iniciar la cámara. Revisa los permisos e inténtalo de nuevo.");
+                showError(err.message || "No se pudo iniciar la cámara. Revisa los permisos e inténtalo de nuevo.");
             }
         }
 
@@ -239,14 +246,9 @@
             arActiveControls.classList.add('hidden');
             state.isArActive = false;
             
-            // Restablecer el botón a su estado correcto
             if (areAssetsLoaded && isSceneReady) {
                 startBtn.disabled = false;
-                startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
-                buttonSpinner.style.display = 'none';
-                buttonText.textContent = 'Iniciar Experiencia';
-                loadingDetails.style.display = 'none';
+                checkIfReady(); // Llama para restablecer el texto del botón
             }
         }
         
