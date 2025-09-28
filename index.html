@@ -20,6 +20,13 @@
             width: 100%;
             height: 100%;
         }
+        /* Animación para el spinner de carga */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-900 overflow-hidden">
@@ -30,12 +37,18 @@
         <h1 class="text-4xl font-bold mb-2">Ecobook AR</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
         <button id="start-ar-btn" class="bg-green-500 text-white font-bold py-3 px-8 rounded-full hover:bg-green-600 transition duration-300 shadow-xl text-lg flex items-center" disabled>
-            <!-- El texto se cambiará con JavaScript -->
             Cargando Recursos...
         </button>
     </div>
 
-    <!-- Contenedor para la Escena AR (ahora con la escena precargada pero oculta) -->
+    <!-- SOLUCIÓN: Pantalla de Carga Intermedia -->
+    <div id="loading-screen" class="hidden fixed inset-0 z-50 flex flex-col justify-center items-center text-center bg-gray-900 bg-opacity-90 text-white p-6">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+        <h2 class="text-2xl font-bold mb-2">Preparando la Experiencia</h2>
+        <p class="max-w-md">Por favor, acepta el permiso para usar la cámara cuando tu navegador lo solicite.</p>
+    </div>
+
+    <!-- Contenedor para la Escena AR -->
     <div id="ar-scene-container" class="fixed inset-0 z-10">
         <a-scene id="ar-scene" style="display: none;"
             mindar-image="autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
@@ -44,15 +57,12 @@
             vr-mode-ui="enabled: false"
             device-orientation-permission-ui="enabled: false">
             
-            <!-- SOLUCIÓN: Aumentamos el tiempo de espera para evitar errores de carga -->
             <a-assets id="ar-assets" timeout="60000"></a-assets>
             
             <a-entity light="type: ambient; color: #BBB"></a-entity>
             <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="-0.5 1 1"></a-entity>
 
             <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-            <!-- Los contenedores para los modelos se añadirán aquí con JavaScript -->
         </a-scene>
     </div>
     
@@ -61,102 +71,70 @@
          <button id="stop-ar-btn" class="bg-red-500 text-white font-bold py-3 px-6 rounded-full hover:bg-red-600 transition duration-300 shadow-xl">Detener Cámara</button>
     </div>
 
-    <!-- Pantalla de Error (en lugar de 'alert') -->
+    <!-- Pantalla de Error -->
     <div id="error-screen" class="hidden fixed inset-0 z-40 flex flex-col justify-center items-center text-center bg-black bg-opacity-70 text-white p-6">
         <h2 class="text-2xl font-bold mb-4">¡Oops! Algo salió mal</h2>
-        <p id="error-message" class="max-w-md mb-6">No se pudo iniciar la cámara. Asegúrate de haber otorgado los permisos necesarios en tu navegador e inténtalo de nuevo.</p>
+        <p id="error-message" class="max-w-md mb-6"></p>
         <button id="close-error-btn" class="bg-blue-500 text-white font-bold py-2 px-6 rounded-full hover:bg-blue-600 transition duration-300">Entendido</button>
     </div>
     
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-
-        // --- COMPONENTE A-FRAME PARA INTERACCIÓN TÁCTIL (Sin cambios) ---
         AFRAME.registerComponent('target-interaction', {
             init: function () {
                 this.model = null; this.pinching = false; this.rotating = false;
                 this.initialPinchDistance = 0; this.lastTouchPosition = { x: 0, y: 0 };
-                this.onTouchStart = this.onTouchStart.bind(this);
-                this.onTouchMove = this.onTouchMove.bind(this);
-                this.onTouchEnd = this.onTouchEnd.bind(this);
+                this.onTouchStart = this.onTouchStart.bind(this); this.onTouchMove = this.onTouchMove.bind(this); this.onTouchEnd = this.onTouchEnd.bind(this);
                 this.el.addEventListener('targetFound', () => {
                     this.model = this.el.querySelector('a-gltf-model');
                     if (this.model) {
                         const canvas = this.el.sceneEl.canvas;
-                        canvas.addEventListener('touchstart', this.onTouchStart);
-                        canvas.addEventListener('touchmove', this.onTouchMove);
-                        canvas.addEventListener('touchend', this.onTouchEnd);
+                        canvas.addEventListener('touchstart', this.onTouchStart); canvas.addEventListener('touchmove', this.onTouchMove); canvas.addEventListener('touchend', this.onTouchEnd);
                     }
                 });
                 this.el.addEventListener('targetLost', () => {
                     if (this.model) {
                         const canvas = this.el.sceneEl.canvas;
-                        canvas.removeEventListener('touchstart', this.onTouchStart);
-                        canvas.removeEventListener('touchmove', this.onTouchMove);
-                        canvas.removeEventListener('touchend', this.onTouchEnd);
+                        canvas.removeEventListener('touchstart', this.onTouchStart); canvas.removeEventListener('touchmove', this.onTouchMove); canvas.removeEventListener('touchend', this.onTouchEnd);
                     }
                     this.model = null;
                 });
             },
             onTouchStart: function (evt) {
                 if (!this.model) return; evt.preventDefault();
-                if (evt.touches.length === 1) {
-                    this.rotating = true;
-                    this.lastTouchPosition = { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
-                } else if (evt.touches.length === 2) {
-                    this.rotating = false; this.pinching = true;
-                    this.initialPinchDistance = this.getDistance(evt.touches[0], evt.touches[1]);
-                    this.initialScale = this.model.object3D.scale.clone();
-                }
+                if (evt.touches.length === 1) { this.rotating = true; this.lastTouchPosition = { x: evt.touches[0].clientX, y: evt.touches[0].clientY }; } 
+                else if (evt.touches.length === 2) { this.rotating = false; this.pinching = true; this.initialPinchDistance = this.getDistance(evt.touches[0], evt.touches[1]); this.initialScale = this.model.object3D.scale.clone(); }
             },
             onTouchMove: function (evt) {
                 if (!this.model) return; evt.preventDefault();
-                if (this.rotating && evt.touches.length === 1) {
-                    const touch = evt.touches[0]; const dx = touch.clientX - this.lastTouchPosition.x;
-                    const dy = touch.clientY - this.lastTouchPosition.y;
-                    this.model.object3D.rotation.y += dx * 0.01; this.model.object3D.rotation.x += dy * 0.01;
-                    this.lastTouchPosition = { x: touch.clientX, y: touch.clientY };
-                } else if (this.pinching && evt.touches.length === 2) {
-                    const currentPinchDistance = this.getDistance(evt.touches[0], evt.touches[1]);
-                    if (this.initialPinchDistance === 0) return;
-                    const scaleFactor = currentPinchDistance / this.initialPinchDistance;
-                    const newScale = this.initialScale.clone().multiplyScalar(scaleFactor);
-                    this.model.object3D.scale.copy(newScale);
-                }
+                if (this.rotating && evt.touches.length === 1) { const touch = evt.touches[0]; const dx = touch.clientX - this.lastTouchPosition.x; const dy = touch.clientY - this.lastTouchPosition.y; this.model.object3D.rotation.y += dx * 0.01; this.model.object3D.rotation.x += dy * 0.01; this.lastTouchPosition = { x: touch.clientX, y: touch.clientY }; } 
+                else if (this.pinching && evt.touches.length === 2) { const currentPinchDistance = this.getDistance(evt.touches[0], evt.touches[1]); if (this.initialPinchDistance === 0) return; const scaleFactor = currentPinchDistance / this.initialPinchDistance; const newScale = this.initialScale.clone().multiplyScalar(scaleFactor); this.model.object3D.scale.copy(newScale); }
             },
-            onTouchEnd: function (evt) {
-                if (!this.model) return;
-                if (evt.touches.length < 2) this.pinching = false;
-                if (evt.touches.length < 1) this.rotating = false;
-            },
-            getDistance: function (t1, t2) {
-                const dx = t1.clientX - t2.clientX; const dy = t1.clientY - t2.clientY;
-                return Math.sqrt(dx * dx + dy * dy);
-            }
+            onTouchEnd: function (evt) { if (!this.model) return; if (evt.touches.length < 2) this.pinching = false; if (evt.touches.length < 1) this.rotating = false; },
+            getDistance: function (t1, t2) { const dx = t1.clientX - t2.clientX; const dy = t1.clientY - t2.clientY; return Math.sqrt(dx * dx + dy * dy); }
         });
 
-        // --- ESTADO Y CONSTANTES ---
         const state = { isArActive: false, assets: [], };
         const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/';
-        const MARKERS_URL = `${GITHUB_BASE_URL}markers/`;
-        const MODELS_URL = `${GITHUB_BASE_URL}modelss/`;
         const ASSETS_CONFIG = [
-            { name: 'botellytaazul', scale: 0.5, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
-            { name: 'ecoladrillo', scale: 0.5, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
-            { name: 'lataplateada', scale: 0.5, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
-            { name: 'papelitoverde', scale: 0.5, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
-            { name: 'senorcontenedor', scale: 0.5, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
-            { name: 'taparoja', scale: 0.5, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
+            { name: 'botellytaazul', scale: 0.5 }, { name: 'ecoladrillo', scale: 0.5 }, { name: 'lataplateada', scale: 0.5 },
+            { name: 'papelitoverde', scale: 0.5 }, { name: 'senorcontenedor', scale: 0.5 }, { name: 'taparoja', scale: 0.5 },
         ];
         state.assets = ASSETS_CONFIG.map((config, index) => ({
-            id: index, markerUrl: `${MARKERS_URL}${config.name}.mind`,
-            modelUrl: `${MODELS_URL}${config.name}.glb`, transform: config
+            id: index,
+            markerUrl: `${GITHUB_BASE_URL}markers/${config.name}.mind`,
+            modelUrl: `${GITHUB_BASE_URL}modelss/${config.name}.glb`,
+            transform: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: config.scale
+            }
         }));
         
-        // --- Elementos del DOM ---
         const startBtn = document.getElementById('start-ar-btn');
         const stopBtn = document.getElementById('stop-ar-btn');
         const welcomeScreen = document.getElementById('welcome-screen');
+        const loadingScreen = document.getElementById('loading-screen');
         const arSceneEl = document.getElementById('ar-scene');
         const arAssetsEl = document.getElementById('ar-assets');
         const arActiveControls = document.getElementById('ar-active-controls');
@@ -164,7 +142,6 @@
         const errorMessage = document.getElementById('error-message');
         const closeErrorBtn = document.getElementById('close-error-btn');
 
-        // --- PREPARAR LA ESCENA UNA VEZ ---
         function setupARScene() {
             const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
             arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`);
@@ -180,26 +157,25 @@
                 const targetEl = document.createElement('a-entity');
                 targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
                 targetEl.setAttribute('target-interaction', '');
-
-                const modelEntity = document.createElement('a-gltf-model');
                 const t = asset.transform;
+                const modelEntity = document.createElement('a-gltf-model');
                 modelEntity.setAttribute('src', `#model-${asset.id}`);
                 modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
                 modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
                 modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
                 modelEntity.setAttribute('animation-mixer', '');
-                
                 targetEl.appendChild(modelEntity);
                 arSceneEl.appendChild(targetEl);
             });
 
             arSceneEl.addEventListener('arReady', () => {
+                loadingScreen.classList.add('hidden');
                 arActiveControls.classList.remove('hidden');
                 state.isArActive = true;
             });
             arSceneEl.addEventListener('arError', (event) => {
                 console.error("Error al iniciar MindAR:", event.detail);
-                let message = "No se pudo iniciar la cámara. Por favor, asegúrate de haberle dado permisos y vuelve a intentarlo.";
+                let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos y vuelve a intentarlo.";
                 if (event.detail?.name === 'NotFoundError') { message = "No se encontró una cámara compatible en tu dispositivo."; }
                 if (event.detail?.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en tu navegador."; }
                 showError(message);
@@ -207,21 +183,21 @@
             });
         }
         
-        // --- FUNCIONES DE LA APLICACIÓN ---
-        async function startAR() {
+        function startAR() {
             startBtn.disabled = true;
-            startBtn.textContent = "Iniciando Cámara...";
+            welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+            loadingScreen.classList.remove('hidden');
 
-            try {
-                const mindarSystem = arSceneEl.systems['mindar-image'];
-                await mindarSystem.start();
-                welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-                arSceneEl.style.display = 'block';
-            } catch (err) {
-                console.error("Fallo al iniciar AR:", err);
-                showError("No se pudo iniciar la cámara. Revisa los permisos.");
-                stopAR();
-            }
+            setTimeout(async () => {
+                try {
+                    const mindarSystem = arSceneEl.systems['mindar-image'];
+                    await mindarSystem.start();
+                    arSceneEl.style.display = 'block';
+                } catch (err) {
+                    console.error("Fallo al iniciar AR:", err);
+                    showError("No se pudo iniciar la cámara. Revisa los permisos e inténtalo de nuevo.");
+                }
+            }, 100);
         }
 
         function stopAR() {
@@ -230,6 +206,7 @@
                 mindarSystem.stop();
             }
             arSceneEl.style.display = 'none';
+            loadingScreen.classList.add('hidden');
             welcomeScreen.classList.remove('opacity-0', 'pointer-events-none');
             arActiveControls.classList.add('hidden');
             startBtn.disabled = false;
@@ -238,21 +215,22 @@
         }
         
         function showError(message) {
+            loadingScreen.classList.add('hidden');
             errorMessage.textContent = message;
             errorScreen.classList.remove('hidden');
         }
 
         function hideError() {
             errorScreen.classList.add('hidden');
+            // Al cerrar el error, volvemos a la pantalla de bienvenida
+            stopAR();
         }
 
-        // --- EVENT LISTENERS E INICIALIZACIÓN ---
         arAssetsEl.addEventListener('loaded', () => {
             console.log("Todos los recursos AR han sido cargados.");
             startBtn.disabled = false;
             startBtn.innerHTML = '<svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/0000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Iniciar Experiencia';
         });
-
         arAssetsEl.addEventListener('timeout', () => {
             console.error("La carga de recursos ha superado el tiempo de espera.");
             showError("La carga de los modelos 3D tardó demasiado. Revisa tu conexión a internet e inténtalo de nuevo.");
@@ -266,6 +244,7 @@
     </script>
 </body>
 </html>
+
 
 
 
