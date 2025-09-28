@@ -60,7 +60,6 @@
             vr-mode-ui="enabled: false"
             device-orientation-permission-ui="enabled: false">
             
-            <!-- SOLUCIÓN: Aumentado el tiempo de espera a 3 minutos -->
             <a-assets id="ar-assets" timeout="180000"></a-assets>
             
             <a-entity light="type: ambient; color: #BBB"></a-entity>
@@ -124,16 +123,17 @@
         });
 
         const state = { isArActive: false, assets: [], };
-        const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/';
+        
+        // SOLUCIÓN: Usar rutas relativas para que funcione con GitHub Pages
+        const BASE_URL = './asetss/';
         const ASSETS_CONFIG = [
             { name: 'botellytaazul', scale: 0.5 }, { name: 'ecoladrillo', scale: 0.5 }, { name: 'lataplateada', scale: 0.5 },
             { name: 'papelitoverde', scale: 0.5 }, { name: 'senorcontenedor', scale: 0.5 }, { name: 'taparoja', scale: 0.5 },
         ];
         state.assets = ASSETS_CONFIG.map((config, index) => ({
             id: index,
-            markerUrl: `${GITHUB_BASE_URL}markers/${config.name}.mind`,
-            // SOLUCIÓN: Corregido el error tipográfico de 'modelss' (doble s) a 'models'
-            modelUrl: `${GITHUB_BASE_URL}modelss/${config.name}.glb`,
+            markerUrl: `${BASE_URL}markers/${config.name}.mind`,
+            modelUrl: `${BASE_URL}modelss/${config.name}.glb`,
             transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: config.scale }
         }));
         
@@ -169,18 +169,9 @@
 
         async function configureMindAR() {
             try {
-                log("Descargando marcadores para crear URLs seguras...");
-                const markerBlobUrls = await Promise.all(
-                    state.assets.map(async (asset) => {
-                        const response = await fetch(asset.markerUrl);
-                        if (!response.ok) throw new Error(`Fallo al descargar: ${asset.markerUrl}`);
-                        const blob = await response.blob();
-                        return URL.createObjectURL(blob);
-                    })
-                );
-                log("URLs de marcadores seguras creadas.");
-
-                const markerUrlList = markerBlobUrls.join(';');
+                log("Configurando sistema MindAR...");
+                
+                const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
                 arSceneEl.setAttribute('mindar-image', {
                     imageTargetSrc: markerUrlList,
                     autoStart: false,
@@ -301,7 +292,6 @@
             stopAR();
         }
         
-        // --- SOLUCIÓN: Listener de progreso de carga ---
         arAssetsEl.addEventListener('progress', (event) => {
             const progress = event.detail.progress * 100;
             loadingDetails.innerHTML = `Descargando paquetes para la experiencia...<br>Progreso de descarga: ${progress.toFixed(2)}%`;
@@ -317,10 +307,8 @@
             showError("La carga de los modelos 3D tardó demasiado. Revisa tu conexión a internet e inténtalo de nuevo.");
         });
 
-        // Iniciar la configuración
         setupSceneContent();
         
-        // Listeners de botones
         startBtn.addEventListener('click', startAR);
         stopBtn.addEventListener('click', stopAR);
         closeErrorBtn.addEventListener('click', hideError);
