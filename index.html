@@ -42,7 +42,6 @@
 
     <!-- Contenedor para la Escena AR -->
     <div id="ar-scene-container" class="fixed inset-0 z-10">
-        <!-- SOLUCIÓN: La escena ya existe en el HTML con autoStart: false. Se configurará con JS. -->
         <a-scene id="ar-scene" style="display: none;"
                  mindar-image="autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
                  color-space="sRGB"
@@ -73,8 +72,40 @@
     
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // --- COMPONENTE DE INTERACCIÓN (sin cambios) ---
-        AFRAME.registerComponent('target-interaction', { /* ... tu código de interacción táctil va aquí ... */ });
+        // --- COMPONENTE DE INTERACCIÓN ---
+        AFRAME.registerComponent('target-interaction', {
+            init: function () {
+                this.model = null; this.pinching = false; this.rotating = false;
+                this.initialPinchDistance = 0; this.lastTouchPosition = { x: 0, y: 0 };
+                this.onTouchStart = this.onTouchStart.bind(this); this.onTouchMove = this.onTouchMove.bind(this); this.onTouchEnd = this.onTouchEnd.bind(this);
+                this.el.addEventListener('targetFound', () => {
+                    this.model = this.el.querySelector('a-gltf-model');
+                    if (this.model) {
+                        const canvas = this.el.sceneEl.canvas;
+                        canvas.addEventListener('touchstart', this.onTouchStart); canvas.addEventListener('touchmove', this.onTouchMove); canvas.addEventListener('touchend', this.onTouchEnd);
+                    }
+                });
+                this.el.addEventListener('targetLost', () => {
+                    if (this.model) {
+                        const canvas = this.el.sceneEl.canvas;
+                        canvas.removeEventListener('touchstart', this.onTouchStart); canvas.removeEventListener('touchmove', this.onTouchMove); canvas.removeEventListener('touchend', this.onTouchEnd);
+                    }
+                    this.model = null;
+                });
+            },
+            onTouchStart: function (evt) {
+                if (!this.model) return; evt.preventDefault();
+                if (evt.touches.length === 1) { this.rotating = true; this.lastTouchPosition = { x: evt.touches[0].clientX, y: evt.touches[0].clientY }; } 
+                else if (evt.touches.length === 2) { this.rotating = false; this.pinching = true; this.initialPinchDistance = this.getDistance(evt.touches[0], evt.touches[1]); this.initialScale = this.model.object3D.scale.clone(); }
+            },
+            onTouchMove: function (evt) {
+                if (!this.model) return; evt.preventDefault();
+                if (this.rotating && evt.touches.length === 1) { const touch = evt.touches[0]; const dx = touch.clientX - this.lastTouchPosition.x; const dy = touch.clientY - this.lastTouchPosition.y; this.model.object3D.rotation.y += dx * 0.01; this.model.object3D.rotation.x += dy * 0.01; this.lastTouchPosition = { x: touch.clientX, y: touch.clientY }; } 
+                else if (this.pinching && evt.touches.length === 2) { const currentPinchDistance = this.getDistance(evt.touches[0], evt.touches[1]); if (this.initialPinchDistance === 0) return; const scaleFactor = currentPinchDistance / this.initialPinchDistance; const newScale = this.initialScale.clone().multiplyScalar(scaleFactor); this.model.object3D.scale.copy(newScale); }
+            },
+            onTouchEnd: function (evt) { if (!this.model) return; if (evt.touches.length < 2) this.pinching = false; if (evt.touches.length < 1) this.rotating = false; },
+            getDistance: function (t1, t2) { const dx = t1.clientX - t2.clientX; const dy = t1.clientY - t2.clientY; return Math.sqrt(dx * dx + dy * dy); }
+        });
 
         // --- ESTADO Y CONFIGURACIÓN ---
         const state = { isArActive: false, assets: [], };
@@ -108,11 +139,9 @@
         // --- LÓGICA DE INICIALIZACIÓN ROBUSTA ---
         async function initialize() {
             try {
-                // 1. Configurar los marcadores en el atributo de la escena
                 const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
                 arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false;`);
 
-                // 2. Crear los assets y las entidades de los modelos 3D en el DOM
                 state.assets.forEach((asset, index) => {
                     const assetItem = document.createElement('a-asset-item');
                     assetItem.setAttribute('id', `model-${asset.id}`);
@@ -135,23 +164,36 @@
                     arSceneEl.appendChild(targetEl);
                 });
 
-                // 3. Esperar a que los modelos 3D y la escena de A-Frame se carguen en paralelo
                 loadingDetails.textContent = 'Descargando recursos...';
                 await Promise.all([
                     new Promise(resolve => arAssetsEl.addEventListener('loaded', resolve)),
                     new Promise(resolve => arSceneEl.hasLoaded ? resolve() : arSceneEl.addEventListener('loaded', resolve))
                 ]);
 
-                // 4. Todo está listo, habilitar el botón de inicio
+                // *** CAMBIO CLAVE: Esperar explícitamente a que el sistema MindAR se registre ***
+                loadingDetails.textContent = 'Inicializando sistema AR...';
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error("El sistema MindAR tardó demasiado en inicializar.")), 10000);
+                    const checkInterval = setInterval(() => {
+                        if (arSceneEl.systems['mindar-image']) {
+                            clearInterval(checkInterval);
+                            clearTimeout(timeout);
+                            console.log("Sistema MindAR detectado y listo.");
+                            resolve();
+                        }
+                    }, 100);
+                });
+
                 loadingDetails.textContent = '¡Listo para empezar!';
                 startBtn.disabled = false;
                 startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
                 startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
                 buttonSpinner.style.display = 'none';
                 buttonText.textContent = 'Iniciar Experiencia';
+
             } catch (err) {
                  console.error("Error grave en la inicialización:", err);
-                 showError("No se pudieron cargar los recursos para la experiencia AR.");
+                 showError(err.message || "No se pudieron cargar los recursos para la experiencia AR.");
             }
         }
 
@@ -159,12 +201,13 @@
         async function startAR() {
             welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
             loadingScreen.classList.remove('hidden');
-
             await new Promise(resolve => setTimeout(resolve, 100)); 
 
             try {
-                // Ahora es 100% seguro que el sistema MindAR existe
                 const mindarSystem = arSceneEl.systems['mindar-image'];
+                if (!mindarSystem) {
+                    throw new Error("El sistema MindAR no fue encontrado. Intenta recargar la página.");
+                }
                 await mindarSystem.start(); 
                 
                 arSceneEl.style.display = 'block';
@@ -219,6 +262,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
