@@ -191,46 +191,57 @@
                 arSceneEl.appendChild(targetEl);
             });
 
-            // 2. Esperar a que la escena de A-Frame esté completamente cargada
-            arSceneEl.addEventListener('loaded', () => {
-                const mindarSystem = arSceneEl.systems['mindar-image'];
-                
-                // Si el sistema no está listo, mostrar error.
-                if (!mindarSystem) {
-                    showError("El sistema de Realidad Aumentada no pudo inicializarse.");
-                    return;
-                }
+            // 2. LÓGICA DE CARGA ROBUSTA BASADA EN EVENTOS
+            const assetsLoadedPromise = new Promise((resolve, reject) => {
+                arAssetsEl.addEventListener('loaded', resolve);
+                arAssetsEl.addEventListener('timeout', () => reject(new Error("La carga de los modelos 3D tardó demasiado.")));
+            });
 
-                // 3. Habilitar el botón de inicio
-                loadingDetails.textContent = '¡Listo para empezar!';
-                startBtn.disabled = false;
-                startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
-                buttonSpinner.style.display = 'none';
-                buttonText.textContent = 'Iniciar Experiencia';
-                
-                // 4. Asignar el evento click AHORA que sabemos que todo está listo
-                startBtn.addEventListener('click', async () => {
-                    welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-                    loadingScreen.classList.remove('hidden');
-
-                    try {
-                        // Llamar a start() es ahora seguro
-                        await mindarSystem.start();
-                        arSceneEl.style.display = 'block';
-                        arActiveControls.classList.remove('hidden');
-                        state.isArActive = true;
-                    } catch (err) {
-                        console.error("Fallo al iniciar AR (solicitud de cámara):", err);
-                        let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos.";
-                        if (err.name === 'NotFoundError' || err.name === 'TrackStartError') { message = "No se encontró una cámara compatible."; }
-                        if (err.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en tu navegador y recarga."; }
-                        showError(message);
-                    } finally {
-                        loadingScreen.classList.add('hidden');
+            const mindarReadyPromise = new Promise((resolve, reject) => {
+                arSceneEl.addEventListener('componentinitialized', (evt) => {
+                    if (evt.detail.name === 'mindar-image') {
+                        resolve();
                     }
                 });
+                setTimeout(() => reject(new Error("El sistema MindAR no se inicializó a tiempo.")), 15000);
             });
+            
+            loadingDetails.textContent = 'Descargando recursos...';
+            
+            Promise.all([assetsLoadedPromise, mindarReadyPromise])
+                .then(() => {
+                    const mindarSystem = arSceneEl.systems['mindar-image'];
+
+                    loadingDetails.textContent = '¡Listo para empezar!';
+                    startBtn.disabled = false;
+                    startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                    buttonSpinner.style.display = 'none';
+                    buttonText.textContent = 'Iniciar Experiencia';
+
+                    startBtn.addEventListener('click', async () => {
+                        welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+                        loadingScreen.classList.remove('hidden');
+                        try {
+                            await mindarSystem.start();
+                            arSceneEl.style.display = 'block';
+                            arActiveControls.classList.remove('hidden');
+                            state.isArActive = true;
+                        } catch (err) {
+                            console.error("Fallo al iniciar AR (solicitud de cámara):", err);
+                            let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos.";
+                            if (err.name === 'NotFoundError' || err.name === 'TrackStartError') { message = "No se encontró una cámara compatible."; }
+                            if (err.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en tu navegador y recarga."; }
+                            showError(message);
+                        } finally {
+                            loadingScreen.classList.add('hidden');
+                        }
+                    });
+                })
+                .catch((err) => {
+                    console.error("Error grave en la inicialización:", err);
+                    showError(err.message);
+                });
         };
 
         // --- EVENT LISTENERS GENERALES ---
