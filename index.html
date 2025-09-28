@@ -6,26 +6,13 @@
     <title>Ecobook AR</title>
     <!-- Tailwind CSS para el diseño -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- A-Frame (versión del ejemplo funcional) -->
+    <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <!-- MindAR para A-Frame (versión del ejemplo funcional) -->
+    <!-- MindAR para A-Frame -->
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
-        /* Estilos para el loader de carga */
-        .loader {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #ffffff;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* Estilos para la interfaz de escaneo de MindAR */
+        /* Estilos para la interfaz de escaneo personalizada de MindAR */
         #scanning-overlay {
             position: fixed;
             top: 0;
@@ -35,10 +22,34 @@
             background-color: rgba(0, 0, 0, 0.6);
             color: white;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             font-size: 1.2em;
             z-index: 10000;
+        }
+         .scanning-box {
+            border: 4px solid white;
+            border-radius: 12px;
+            width: 250px;
+            height: 250px;
+            position: relative;
+            background: linear-gradient(to top, white, white) no-repeat top/40px 4px,
+                        linear-gradient(to top, white, white) no-repeat top/4px 40px,
+                        linear-gradient(to top, white, white) no-repeat bottom/40px 4px,
+                        linear-gradient(to top, white, white) no-repeat bottom/4px 40px,
+                        linear-gradient(to top, white, white) no-repeat top right/40px 4px,
+                        linear-gradient(to top, white, white) no-repeat top right/4px 40px,
+                        linear-gradient(to top, white, white) no-repeat bottom left/40px 4px,
+                        linear-gradient(to top, white, white) no-repeat bottom left/4px 40px,
+                        linear-gradient(to top, white, white) no-repeat top left/40px 4px,
+                        linear-gradient(to top, white, white) no-repeat top left/4px 40px,
+                        linear-gradient(to top, white, white) no-repeat bottom right/40px 4px,
+                        linear-gradient(to top, white, white) no-repeat bottom right/4px 40px;
+        }
+        .scanning-text {
+            margin-top: 20px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -53,11 +64,6 @@
             <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
             Iniciar Experiencia
         </button>
-        <!-- Este contenedor de estado ya no es necesario, MindAR lo gestionará -->
-        <div id="ar-status" class="text-center font-mono p-2 bg-black bg-opacity-25 rounded mt-8 flex justify-center items-center gap-2 hidden min-w-[200px]">
-            <div id="loader" class="loader"></div>
-            <span id="ar-status-text"></span>
-        </div>
     </div>
 
     <!-- Contenedor para la Escena AR -->
@@ -65,7 +71,8 @@
     
     <!-- Elemento para la UI de escaneo de MindAR -->
     <div id="scanning-overlay" class="hidden">
-        <div>Escaneando...</div>
+        <div class="scanning-box"></div>
+        <div class="scanning-text">Buscando marcador...</div>
     </div>
 
     <!-- Controles cuando la AR está activa -->
@@ -185,7 +192,6 @@
         const welcomeScreen = document.getElementById('welcome-screen');
         const arSceneContainer = document.getElementById('ar-scene-container');
         const arActiveControls = document.getElementById('ar-active-controls');
-        const scanningOverlay = document.getElementById('scanning-overlay');
 
         // --- FUNCIONES DE LA APLICACIÓN ---
         
@@ -242,7 +248,9 @@
 
             sceneEl.addEventListener('arError', (event) => {
                 console.error("Error al iniciar MindAR:", event.detail);
-                // Aquí podrías mostrar un mensaje de error al usuario
+                // Si hay un error, volvemos a la pantalla de bienvenida
+                stopAR();
+                alert("Hubo un error al iniciar la cámara. Por favor, asegúrate de haberle dado permisos y vuelve a intentarlo.");
             });
 
             arSceneContainer.appendChild(sceneEl);
@@ -254,7 +262,10 @@
                 if (sceneEl.systems['mindar-image']) {
                     sceneEl.systems['mindar-image'].stop();
                 }
-                sceneEl.parentNode.removeChild(sceneEl);
+                // Eliminar la escena de forma segura
+                if (sceneEl.parentNode) {
+                    sceneEl.parentNode.removeChild(sceneEl);
+                }
             }
             arSceneContainer.innerHTML = '';
             
