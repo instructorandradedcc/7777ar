@@ -29,15 +29,14 @@
         <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
         <h1 class="text-4xl font-bold mb-2">Ecobook AR</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
-        <button id="start-ar-btn" class="bg-green-500 text-white font-bold py-3 px-8 rounded-full hover:bg-green-600 transition duration-300 shadow-xl text-lg flex items-center">
-            <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-            Iniciar Experiencia
+        <button id="start-ar-btn" class="bg-green-500 text-white font-bold py-3 px-8 rounded-full hover:bg-green-600 transition duration-300 shadow-xl text-lg flex items-center" disabled>
+            <!-- El texto se cambiará con JavaScript -->
+            Cargando Recursos...
         </button>
     </div>
 
     <!-- Contenedor para la Escena AR (ahora con la escena precargada pero oculta) -->
     <div id="ar-scene-container" class="fixed inset-0 z-10">
-        <!-- SOLUCIÓN: La escena A-Frame se define aquí desde el principio, pero oculta con display:none -->
         <a-scene id="ar-scene" style="display: none;"
             mindar-image="autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
             color-space="sRGB"
@@ -45,9 +44,9 @@
             vr-mode-ui="enabled: false"
             device-orientation-permission-ui="enabled: false">
             
-            <a-assets id="ar-assets"></a-assets>
+            <!-- SOLUCIÓN: Aumentamos el tiempo de espera para evitar errores de carga -->
+            <a-assets id="ar-assets" timeout="60000"></a-assets>
             
-            <!-- Iluminación para que los modelos 3D no se vean negros -->
             <a-entity light="type: ambient; color: #BBB"></a-entity>
             <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="-0.5 1 1"></a-entity>
 
@@ -159,6 +158,7 @@
         const stopBtn = document.getElementById('stop-ar-btn');
         const welcomeScreen = document.getElementById('welcome-screen');
         const arSceneEl = document.getElementById('ar-scene');
+        const arAssetsEl = document.getElementById('ar-assets');
         const arActiveControls = document.getElementById('ar-active-controls');
         const errorScreen = document.getElementById('error-screen');
         const errorMessage = document.getElementById('error-message');
@@ -166,11 +166,6 @@
 
         // --- PREPARAR LA ESCENA UNA VEZ ---
         function setupARScene() {
-            const assetsEl = document.getElementById('ar-assets');
-            assetsEl.innerHTML = ''; // Limpiar assets anteriores si se llama de nuevo
-            arSceneEl.innerHTML = ''; // Limpiar entidades anteriores
-            arSceneEl.appendChild(assetsEl);
-
             const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
             arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`);
             
@@ -178,7 +173,7 @@
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.setAttribute('id', `model-${asset.id}`);
                 assetItem.setAttribute('src', asset.modelUrl);
-                assetsEl.appendChild(assetItem);
+                arAssetsEl.appendChild(assetItem);
             });
             
             state.assets.forEach((asset, index) => {
@@ -198,7 +193,7 @@
                 arSceneEl.appendChild(targetEl);
             });
 
-             arSceneEl.addEventListener('arReady', () => {
+            arSceneEl.addEventListener('arReady', () => {
                 arActiveControls.classList.remove('hidden');
                 state.isArActive = true;
             });
@@ -218,31 +213,27 @@
             startBtn.textContent = "Iniciando Cámara...";
 
             try {
-                // SOLUCIÓN: Obtenemos el sistema MindAR de la escena existente y lo iniciamos.
                 const mindarSystem = arSceneEl.systems['mindar-image'];
                 await mindarSystem.start();
-                
                 welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
                 arSceneEl.style.display = 'block';
             } catch (err) {
                 console.error("Fallo al iniciar AR:", err);
                 showError("No se pudo iniciar la cámara. Revisa los permisos.");
-                stopAR(); // Asegurarse de limpiar en caso de error
+                stopAR();
             }
         }
 
         function stopAR() {
-            // SOLUCIÓN: Ocultamos la escena y detenemos el sistema en lugar de eliminar elementos.
             if (state.isArActive) {
                 const mindarSystem = arSceneEl.systems['mindar-image'];
                 mindarSystem.stop();
             }
             arSceneEl.style.display = 'none';
-            
             welcomeScreen.classList.remove('opacity-0', 'pointer-events-none');
             arActiveControls.classList.add('hidden');
             startBtn.disabled = false;
-            startBtn.innerHTML = '<svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Iniciar Experiencia';
+            startBtn.innerHTML = '<svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/0000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Iniciar Experiencia';
             state.isArActive = false;
         }
         
@@ -256,7 +247,18 @@
         }
 
         // --- EVENT LISTENERS E INICIALIZACIÓN ---
-        setupARScene(); // Preparamos la escena al cargar la página.
+        arAssetsEl.addEventListener('loaded', () => {
+            console.log("Todos los recursos AR han sido cargados.");
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/0000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Iniciar Experiencia';
+        });
+
+        arAssetsEl.addEventListener('timeout', () => {
+            console.error("La carga de recursos ha superado el tiempo de espera.");
+            showError("La carga de los modelos 3D tardó demasiado. Revisa tu conexión a internet e inténtalo de nuevo.");
+        });
+
+        setupARScene();
         startBtn.addEventListener('click', startAR);
         stopBtn.addEventListener('click', stopAR);
         closeErrorBtn.addEventListener('click', hideError);
@@ -264,6 +266,7 @@
     </script>
 </body>
 </html>
+
 
 
 
