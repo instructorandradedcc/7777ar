@@ -42,7 +42,7 @@
             <span id="button-spinner" class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-3"></span>
             <span id="button-text">Cargando</span>
         </button>
-        <p id="loading-details" class="mt-4 text-sm text-gray-200">Descargando paquetes para la experiencia...</p>
+        <p id="loading-details" class="mt-4 text-sm text-gray-200 h-10">Descargando paquetes para la experiencia...</p>
     </div>
 
     <!-- Pantalla de Carga Intermedia -->
@@ -60,7 +60,8 @@
             vr-mode-ui="enabled: false"
             device-orientation-permission-ui="enabled: false">
             
-            <a-assets id="ar-assets" timeout="60000"></a-assets>
+            <!-- SOLUCIÓN: Aumentado el tiempo de espera a 3 minutos -->
+            <a-assets id="ar-assets" timeout="180000"></a-assets>
             
             <a-entity light="type: ambient; color: #BBB"></a-entity>
             <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="-0.5 1 1"></a-entity>
@@ -83,6 +84,11 @@
     
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // --- LOG DETALLADO ---
+        const log = (message) => console.log(`[Ecobook AR Log] ${new Date().toLocaleTimeString()} - ${message}`);
+
+        log("Inicializando aplicación.");
+
         AFRAME.registerComponent('target-interaction', {
             init: function () {
                 this.model = null; this.pinching = false; this.rotating = false;
@@ -126,7 +132,6 @@
         state.assets = ASSETS_CONFIG.map((config, index) => ({
             id: index,
             markerUrl: `${GITHUB_BASE_URL}markers/${config.name}.mind`,
-            // SOLUCIÓN: Corregido el error tipográfico de 'modelss' a 'models'
             modelUrl: `${GITHUB_BASE_URL}models/${config.name}.glb`,
             transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: config.scale }
         }));
@@ -150,7 +155,7 @@
 
         function checkIfReady() {
             if (areAssetsLoaded && isMindARReady) {
-                console.log("Todos los recursos Y la escena están listos.");
+                log("Todos los recursos Y la escena están listos. Habilitando botón de inicio.");
                 startBtn.disabled = false;
                 startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
                 startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
@@ -163,7 +168,7 @@
 
         async function configureMindAR() {
             try {
-                console.log("Descargando marcadores para crear URLs seguras...");
+                log("Descargando marcadores para crear URLs seguras...");
                 const markerBlobUrls = await Promise.all(
                     state.assets.map(async (asset) => {
                         const response = await fetch(asset.markerUrl);
@@ -172,7 +177,7 @@
                         return URL.createObjectURL(blob);
                     })
                 );
-                console.log("URLs de marcadores seguras creadas.");
+                log("URLs de marcadores seguras creadas.");
 
                 const markerUrlList = markerBlobUrls.join(';');
                 arSceneEl.setAttribute('mindar-image', {
@@ -183,6 +188,7 @@
                     uiScanning: 'no',
                 });
                 
+                log("Sistema MindAR configurado exitosamente.");
                 isMindARReady = true;
                 checkIfReady();
 
@@ -193,6 +199,7 @@
         }
 
         function setupSceneContent() {
+            log("Configurando contenido de la escena (modelos y marcadores).");
             state.assets.forEach(asset => {
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.setAttribute('id', `model-${asset.id}`);
@@ -216,6 +223,7 @@
             });
 
             arSceneEl.addEventListener('arReady', () => {
+                log("Evento arReady recibido. La cámara está activa.");
                 loadingScreen.classList.add('hidden');
                 arActiveControls.classList.remove('hidden');
                 state.isArActive = true;
@@ -231,17 +239,18 @@
             });
 
             if (arSceneEl.hasLoaded) {
-                console.log("La escena A-Frame ya estaba cargada.");
+                log("La escena A-Frame ya estaba cargada. Configurando MindAR...");
                 configureMindAR();
             } else {
                 arSceneEl.addEventListener('loaded', () => {
-                    console.log("La escena A-Frame ha sido cargada y está lista.");
+                    log("La escena A-Frame ha sido cargada y está lista. Configurando MindAR...");
                     configureMindAR();
                 });
             }
         }
         
         async function startAR() {
+            log("Botón 'Iniciar Experiencia' presionado.");
             startBtn.disabled = true;
             welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
             loadingScreen.classList.remove('hidden');
@@ -253,6 +262,7 @@
                 if (!mindarSystem || typeof mindarSystem.start !== 'function') {
                     throw new Error("El sistema MindAR no se inicializó correctamente. Por favor, refresca la página.");
                 }
+                log("Iniciando sistema MindAR (solicitando cámara)...");
                 await mindarSystem.start();
                 arSceneEl.style.display = 'block';
             } catch (err) {
@@ -262,6 +272,7 @@
         }
 
         function stopAR() {
+            log("Deteniendo la experiencia AR.");
             if (state.isArActive) {
                 const mindarSystem = arSceneEl.systems['mindar-image'];
                 if (mindarSystem && mindarSystem.isScanning) { mindarSystem.stop(); }
@@ -289,8 +300,14 @@
             stopAR();
         }
         
+        // --- SOLUCIÓN: Listener de progreso de carga ---
+        arAssetsEl.addEventListener('progress', (event) => {
+            const progress = event.detail.progress * 100;
+            loadingDetails.innerHTML = `Descargando paquetes para la experiencia...<br>Progreso de descarga: ${progress.toFixed(2)}%`;
+        });
+
         arAssetsEl.addEventListener('loaded', () => {
-            console.log("Todos los recursos AR (modelos) han sido cargados.");
+            log("Todos los recursos AR (modelos) han sido cargados.");
             areAssetsLoaded = true;
             checkIfReady();
         });
@@ -299,8 +316,10 @@
             showError("La carga de los modelos 3D tardó demasiado. Revisa tu conexión a internet e inténtalo de nuevo.");
         });
 
+        // Iniciar la configuración
         setupSceneContent();
         
+        // Listeners de botones
         startBtn.addEventListener('click', startAR);
         stopBtn.addEventListener('click', stopAR);
         closeErrorBtn.addEventListener('click', hideError);
@@ -308,6 +327,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
