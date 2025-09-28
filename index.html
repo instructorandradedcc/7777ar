@@ -36,12 +36,16 @@
         <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
         <h1 class="text-4xl font-bold mb-2">Ecobook AR</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
-        <button id="start-ar-btn" class="bg-green-500 text-white font-bold py-3 px-8 rounded-full hover:bg-green-600 transition duration-300 shadow-xl text-lg flex items-center" disabled>
-            Cargando Recursos...
+        
+        <!-- SOLUCIÓN: Botón con estado de carga claro -->
+        <button id="start-ar-btn" class="bg-gray-400 text-white font-bold py-3 px-8 rounded-full shadow-xl text-lg flex items-center justify-center cursor-not-allowed" disabled>
+            <span id="button-spinner" class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-3"></span>
+            <span id="button-text">Cargando</span>
         </button>
+        <p id="loading-details" class="mt-4 text-sm text-gray-200">Descargando paquetes para la experiencia...</p>
     </div>
 
-    <!-- SOLUCIÓN: Pantalla de Carga Intermedia -->
+    <!-- Pantalla de Carga Intermedia -->
     <div id="loading-screen" class="hidden fixed inset-0 z-50 flex flex-col justify-center items-center text-center bg-gray-900 bg-opacity-90 text-white p-6">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
         <h2 class="text-2xl font-bold mb-2">Preparando la Experiencia</h2>
@@ -124,14 +128,13 @@
             id: index,
             markerUrl: `${GITHUB_BASE_URL}markers/${config.name}.mind`,
             modelUrl: `${GITHUB_BASE_URL}modelss/${config.name}.glb`,
-            transform: {
-                position: { x: 0, y: 0, z: 0 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scale: config.scale
-            }
+            transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: config.scale }
         }));
         
         const startBtn = document.getElementById('start-ar-btn');
+        const buttonSpinner = document.getElementById('button-spinner');
+        const buttonText = document.getElementById('button-text');
+        const loadingDetails = document.getElementById('loading-details');
         const stopBtn = document.getElementById('stop-ar-btn');
         const welcomeScreen = document.getElementById('welcome-screen');
         const loadingScreen = document.getElementById('loading-screen');
@@ -141,6 +144,22 @@
         const errorScreen = document.getElementById('error-screen');
         const errorMessage = document.getElementById('error-message');
         const closeErrorBtn = document.getElementById('close-error-btn');
+
+        let areAssetsLoaded = false;
+        let isSceneReady = false;
+
+        function checkIfReady() {
+            if (areAssetsLoaded && isSceneReady) {
+                console.log("Todos los recursos Y la escena están listos.");
+                startBtn.disabled = false;
+                startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                buttonSpinner.style.display = 'none';
+                buttonText.textContent = 'Iniciar Experiencia';
+                loadingDetails.textContent = '¡Todo listo!';
+                setTimeout(() => { loadingDetails.style.display = 'none'; }, 2000);
+            }
+        }
 
         function setupARScene() {
             const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
@@ -181,37 +200,54 @@
                 showError(message);
                 stopAR();
             });
+
+            arSceneEl.addEventListener('loaded', () => {
+                console.log("La escena A-Frame ha sido cargada.");
+                isSceneReady = true;
+                checkIfReady();
+            });
         }
         
-        function startAR() {
+        async function startAR() {
             startBtn.disabled = true;
             welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
             loadingScreen.classList.remove('hidden');
 
-            setTimeout(async () => {
-                try {
-                    const mindarSystem = arSceneEl.systems['mindar-image'];
-                    await mindarSystem.start();
-                    arSceneEl.style.display = 'block';
-                } catch (err) {
-                    console.error("Fallo al iniciar AR:", err);
-                    showError("No se pudo iniciar la cámara. Revisa los permisos e inténtalo de nuevo.");
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            try {
+                const mindarSystem = arSceneEl.systems['mindar-image'];
+                if (!mindarSystem) {
+                    throw new Error("El sistema MindAR no está disponible.");
                 }
-            }, 100);
+                await mindarSystem.start();
+                arSceneEl.style.display = 'block';
+            } catch (err) {
+                console.error("Fallo al iniciar AR:", err);
+                showError("No se pudo iniciar la cámara. Revisa los permisos e inténtalo de nuevo.");
+            }
         }
 
         function stopAR() {
             if (state.isArActive) {
                 const mindarSystem = arSceneEl.systems['mindar-image'];
-                mindarSystem.stop();
+                if (mindarSystem) { mindarSystem.stop(); }
             }
             arSceneEl.style.display = 'none';
             loadingScreen.classList.add('hidden');
             welcomeScreen.classList.remove('opacity-0', 'pointer-events-none');
             arActiveControls.classList.add('hidden');
-            startBtn.disabled = false;
-            startBtn.innerHTML = '<svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/0000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Iniciar Experiencia';
             state.isArActive = false;
+            
+            // Restablecer el botón a su estado correcto
+            if (areAssetsLoaded && isSceneReady) {
+                startBtn.disabled = false;
+                startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                buttonSpinner.style.display = 'none';
+                buttonText.textContent = 'Iniciar Experiencia';
+                loadingDetails.style.display = 'none';
+            }
         }
         
         function showError(message) {
@@ -222,14 +258,13 @@
 
         function hideError() {
             errorScreen.classList.add('hidden');
-            // Al cerrar el error, volvemos a la pantalla de bienvenida
             stopAR();
         }
-
+        
         arAssetsEl.addEventListener('loaded', () => {
             console.log("Todos los recursos AR han sido cargados.");
-            startBtn.disabled = false;
-            startBtn.innerHTML = '<svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/0000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Iniciar Experiencia';
+            areAssetsLoaded = true;
+            checkIfReady();
         });
         arAssetsEl.addEventListener('timeout', () => {
             console.error("La carga de recursos ha superado el tiempo de espera.");
@@ -244,6 +279,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
