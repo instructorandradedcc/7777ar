@@ -55,7 +55,6 @@
     <!-- Contenedor para la Escena AR -->
     <div id="ar-scene-container" class="fixed inset-0 z-10">
         <a-scene id="ar-scene" style="display: none;"
-            mindar-image="autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
             color-space="sRGB"
             renderer="colorManagement: true, physicallyCorrectLights"
             vr-mode-ui="enabled: false"
@@ -162,15 +161,10 @@
         }
 
         function setupARScene() {
-            // SOLUCIÓN: Se establece el atributo mindar-image con un objeto para evitar errores de parseo
+            // SOLUCIÓN: Se establece el atributo mindar-image con el formato de string correcto
             const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
-            arSceneEl.setAttribute('mindar-image', {
-                imageTargetSrc: markerUrlList,
-                autoStart: false,
-                uiLoading: 'no',
-                uiError: 'no',
-                uiScanning: 'no'
-            });
+            const mindarImageProps = `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
+            arSceneEl.setAttribute('mindar-image', mindarImageProps);
             
             state.assets.forEach(asset => {
                 const assetItem = document.createElement('a-asset-item');
@@ -248,7 +242,7 @@
             
             if (areAssetsLoaded && isSceneReady) {
                 startBtn.disabled = false;
-                checkIfReady(); // Llama para restablecer el texto del botón
+                checkIfReady();
             }
         }
         
@@ -281,6 +275,7 @@
     </script>
 </body>
 </html>
+
 
 
 
