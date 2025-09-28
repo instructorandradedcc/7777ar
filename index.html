@@ -33,7 +33,7 @@
 
     <!-- Pantalla de Bienvenida -->
     <div id="welcome-screen" class="fixed inset-0 z-30 flex flex-col justify-center items-center text-center bg-gradient-to-br from-indigo-600 to-purple-800 text-white p-6 transition-opacity duration-500 ease-in-out">
-        <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
+        <img src="./asetss/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
         <h1 class="text-4xl font-bold mb-2">Ecobook AR</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
         
@@ -124,7 +124,6 @@
 
         const state = { isArActive: false, assets: [], };
         
-        // SOLUCIÓN: Usar rutas relativas para que funcione con GitHub Pages
         const BASE_URL = './asetss/';
         const ASSETS_CONFIG = [
             { name: 'botellytaazul', scale: 0.5 }, { name: 'ecoladrillo', scale: 0.5 }, { name: 'lataplateada', scale: 0.5 },
@@ -170,15 +169,10 @@
         async function configureMindAR() {
             try {
                 log("Configurando sistema MindAR...");
-                
                 const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
-                arSceneEl.setAttribute('mindar-image', {
-                    imageTargetSrc: markerUrlList,
-                    autoStart: false,
-                    uiLoading: 'no',
-                    uiError: 'no',
-                    uiScanning: 'no',
-                });
+                // SOLUCIÓN DEFINITIVA: Usar un string para setAttribute, no un objeto.
+                const mindarImageProps = `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
+                arSceneEl.setAttribute('mindar-image', mindarImageProps);
                 
                 log("Sistema MindAR configurado exitosamente.");
                 isMindARReady = true;
@@ -316,6 +310,7 @@
     </script>
 </body>
 </html>
+
 
 
 
