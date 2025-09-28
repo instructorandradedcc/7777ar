@@ -174,8 +174,14 @@
                 console.log("URLs de marcadores seguras creadas.");
 
                 const markerUrlList = markerBlobUrls.join(';');
-                const mindarImageProps = `imageTargetSrc: ${markerUrlList}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
-                arSceneEl.setAttribute('mindar-image', mindarImageProps);
+                // SOLUCIÓN DEFINITIVA: Usar un objeto para setAttribute en lugar de un string
+                arSceneEl.setAttribute('mindar-image', {
+                    imageTargetSrc: markerUrlList,
+                    autoStart: false,
+                    uiLoading: 'no',
+                    uiError: 'no',
+                    uiScanning: 'no',
+                });
                 
                 isMindARReady = true;
                 checkIfReady();
@@ -224,7 +230,6 @@
                 stopAR();
             });
 
-            // SOLUCIÓN: Esperar a que la escena esté cargada para configurar MindAR
             if (arSceneEl.hasLoaded) {
                 console.log("La escena A-Frame ya estaba cargada.");
                 configureMindAR();
@@ -294,10 +299,8 @@
             showError("La carga de los modelos 3D tardó demasiado. Revisa tu conexión a internet e inténtalo de nuevo.");
         });
 
-        // Iniciar la configuración
         setupSceneContent();
         
-        // Listeners de botones
         startBtn.addEventListener('click', startAR);
         stopBtn.addEventListener('click', stopAR);
         closeErrorBtn.addEventListener('click', hideError);
