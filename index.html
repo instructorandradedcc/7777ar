@@ -132,7 +132,8 @@
         state.assets = ASSETS_CONFIG.map((config, index) => ({
             id: index,
             markerUrl: `${GITHUB_BASE_URL}markers/${config.name}.mind`,
-            modelUrl: `${GITHUB_BASE_URL}models/${config.name}.glb`,
+            // SOLUCIÓN: Corregido el error tipográfico de 'modelss' (doble s) a 'models'
+            modelUrl: `${GITHUB_BASE_URL}modelss/${config.name}.glb`,
             transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: config.scale }
         }));
         
@@ -327,6 +328,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
