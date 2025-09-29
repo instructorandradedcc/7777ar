@@ -1,3 +1,4 @@
+html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -22,7 +23,7 @@
 
     <!-- Pantalla de Bienvenida -->
     <div id="welcome-screen" class="fixed inset-0 z-30 flex flex-col justify-center items-center text-center bg-gradient-to-br from-indigo-600 to-purple-800 text-white p-6 transition-opacity duration-500 ease-in-out">
-        <img src="./asetss/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
+        <img src="./assets/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
         <h1 class="text-4xl font-bold mb-2">Ecobook AR</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
         
@@ -43,7 +44,7 @@
     <!-- Contenedor para la Escena AR -->
     <div id="ar-scene-container" class="fixed inset-0 z-10">
         <a-scene id="ar-scene" style="display: none;"
-                 mindar-image="autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
+                 mindar-image="autoStart: false; imageTargetSrc:;"
                  color-space="sRGB"
                  renderer="colorManagement: true, physicallyCorrectLights"
                  vr-mode-ui="enabled: false"
@@ -109,7 +110,7 @@
 
         // --- ESTADO Y CONFIGURACIÓN ---
         const state = { isArActive: false, assets: [], };
-        const BASE_URL = './asetss/';
+        const BASE_URL = './assets/';  // Corregido: assets en lugar de asetss
         const ASSETS_CONFIG = [
             { name: 'botellytaazul', scale: 0.5 }, { name: 'ecoladrillo', scale: 0.5 }, { name: 'lataplateada', scale: 0.5 },
             { name: 'papelitoverde', scale: 0.5 }, { name: 'senorcontenedor', scale: 0.5 }, { name: 'taparoja', scale: 0.5 },
@@ -117,7 +118,7 @@
         state.assets = ASSETS_CONFIG.map((config, index) => ({
             id: index,
             markerUrl: `${BASE_URL}markers/${config.name}.mind`,
-            modelUrl: `${BASE_URL}modelss/${config.name}.glb`,
+            modelUrl: `${BASE_URL}models/${config.name}.glb`,  // Corregido: models en lugar de modelss
             transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: config.scale }
         }));
         
@@ -138,6 +139,12 @@
 
         // --- MANEJO DE ERRORES ---
         function showError(message) {
+            loadingDetails.textContent = '';
+            buttonText.textContent = 'Error';
+            startBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+            startBtn.classList.add('bg-red-500');
+            buttonSpinner.style.display = 'none';
+
             loadingScreen.classList.add('hidden');
             errorMessage.textContent = message;
             errorScreen.classList.remove('hidden');
@@ -164,84 +171,114 @@
         }
 
         // --- FUNCIÓN PRINCIPAL DE CONFIGURACIÓN ---
-        const setupARExperience = () => {
-            // 1. Configurar los marcadores y crear los elementos en el DOM
-            const markerUrlList = state.assets.map(asset => asset.markerUrl).join(';');
-            arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrlList}; autoStart: false;`);
-
-            state.assets.forEach((asset, index) => {
-                const assetItem = document.createElement('a-asset-item');
-                assetItem.id = `model-${asset.id}`;
-                assetItem.src = asset.modelUrl;
-                arAssetsEl.appendChild(assetItem);
-
-                const targetEl = document.createElement('a-entity');
-                targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
-                targetEl.setAttribute('target-interaction', '');
+        const setupARExperience = async () => {
+            try {
+                loadingDetails.textContent = 'Configurando escena...';
                 
-                const t = asset.transform;
-                const modelEntity = document.createElement('a-gltf-model');
-                modelEntity.setAttribute('src', `#model-${asset.id}`);
-                modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
-                modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
-                modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
-                modelEntity.setAttribute('animation-mixer', '');
+                // Cargar assets primero
+                await loadAssets();
                 
-                targetEl.appendChild(modelEntity);
-                arSceneEl.appendChild(targetEl);
-            });
+                // Configurar MindAR después de cargar assets
+                const markerUrls = state.assets.map(asset => asset.markerUrl);
+                arSceneEl.setAttribute('mindar-image', `imageTargetSrc: ${markerUrls.join(';')}; autoStart: false;`);
 
-            // 2. LÓGICA DE CARGA ROBUSTA BASADA EN EVENTOS
-            const assetsLoadedPromise = new Promise((resolve, reject) => {
-                arAssetsEl.addEventListener('loaded', resolve);
-                arAssetsEl.addEventListener('timeout', () => reject(new Error("La carga de los modelos 3D tardó demasiado.")));
-            });
+                // Crear entidades de marcadores
+                state.assets.forEach((asset, index) => {
+                    const targetEl = document.createElement('a-entity');
+                    targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
+                    targetEl.setAttribute('target-interaction', '');
+                    
+                    const t = asset.transform;
+                    const modelEntity = document.createElement('a-gltf-model');
+                    modelEntity.setAttribute('src', `#model-${asset.id}`);
+                    modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
+                    modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
+                    modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
+                    modelEntity.setAttribute('animation-mixer', '');
+                    
+                    targetEl.appendChild(modelEntity);
+                    arSceneEl.appendChild(targetEl);
+                });
 
-            const mindarReadyPromise = new Promise((resolve, reject) => {
-                arSceneEl.addEventListener('componentinitialized', (evt) => {
-                    if (evt.detail.name === 'mindar-image') {
-                        resolve();
+                // Esperar a que la escena esté lista
+                await new Promise((resolve, reject) => {
+                    arSceneEl.addEventListener('loaded', resolve);
+                    arSceneEl.addEventListener('error', reject);
+                    arAssetsEl.addEventListener('timeout', () => reject(new Error("Tiempo de carga agotado")));
+                });
+
+                // Configurar botón de inicio
+                loadingDetails.textContent = '¡Listo para empezar!';
+                startBtn.disabled = false;
+                startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                buttonSpinner.style.display = 'none';
+                buttonText.textContent = 'Iniciar Experiencia';
+
+                startBtn.addEventListener('click', async () => {
+                    welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+                    loadingScreen.classList.remove('hidden');
+                    
+                    try {
+                        const mindarSystem = arSceneEl.systems['mindar-image'];
+                        await mindarSystem.start(); // Esto solicitará permisos de cámara
+                        
+                        arSceneEl.style.display = 'block';
+                        arActiveControls.classList.remove('hidden');
+                        state.isArActive = true;
+                    } catch (err) {
+                        console.error("Fallo al iniciar AR:", err);
+                        let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos.";
+                        if (err.name === 'NotFoundError' || err.name === 'TrackStartError') { 
+                            message = "No se encontró una cámara compatible."; 
+                        }
+                        if (err.name === 'NotAllowedError') { 
+                            message = "Permiso a la cámara denegado. Habilítalo en tu navegador y recarga."; 
+                        }
+                        showError(message);
+                    } finally {
+                        loadingScreen.classList.add('hidden');
                     }
                 });
-                setTimeout(() => reject(new Error("El sistema MindAR no se inicializó a tiempo.")), 15000);
-            });
-            
-            loadingDetails.textContent = 'Descargando recursos...';
-            
-            Promise.all([assetsLoadedPromise, mindarReadyPromise])
-                .then(() => {
-                    const mindarSystem = arSceneEl.systems['mindar-image'];
 
-                    loadingDetails.textContent = '¡Listo para empezar!';
-                    startBtn.disabled = false;
-                    startBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                    startBtn.classList.add('bg-green-500', 'hover:bg-green-600');
-                    buttonSpinner.style.display = 'none';
-                    buttonText.textContent = 'Iniciar Experiencia';
+            } catch (error) {
+                console.error("Error en configuración:", error);
+                showError("Error al configurar la experiencia AR: " + error.message);
+            }
+        };
 
-                    startBtn.addEventListener('click', async () => {
-                        welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-                        loadingScreen.classList.remove('hidden');
-                        try {
-                            await mindarSystem.start();
-                            arSceneEl.style.display = 'block';
-                            arActiveControls.classList.remove('hidden');
-                            state.isArActive = true;
-                        } catch (err) {
-                            console.error("Fallo al iniciar AR (solicitud de cámara):", err);
-                            let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos.";
-                            if (err.name === 'NotFoundError' || err.name === 'TrackStartError') { message = "No se encontró una cámara compatible."; }
-                            if (err.name === 'NotAllowedError') { message = "Permiso a la cámara denegado. Habilítalo en tu navegador y recarga."; }
-                            showError(message);
-                        } finally {
-                            loadingScreen.classList.add('hidden');
+        // Función para cargar assets
+        const loadAssets = () => {
+            return new Promise((resolve, reject) => {
+                let loadedCount = 0;
+                const totalAssets = state.assets.length;
+                
+                if (totalAssets === 0) {
+                    resolve();
+                    return;
+                }
+                
+                state.assets.forEach((asset) => {
+                    const assetItem = document.createElement('a-asset-item');
+                    assetItem.id = `model-${asset.id}`;
+                    assetItem.src = asset.modelUrl;
+                    
+                    assetItem.addEventListener('load', () => {
+                        loadedCount++;
+                        loadingDetails.textContent = `Cargando modelos... ${loadedCount}/${totalAssets}`;
+                        if (loadedCount === totalAssets) {
+                            resolve();
                         }
                     });
-                })
-                .catch((err) => {
-                    console.error("Error grave en la inicialización:", err);
-                    showError(err.message);
+                    
+                    assetItem.addEventListener('error', (e) => {
+                        console.error(`Error cargando ${asset.modelUrl}:`, e);
+                        reject(new Error(`Error al cargar el modelo ${asset.name}`));
+                    });
+                    
+                    arAssetsEl.appendChild(assetItem);
                 });
+            });
         };
 
         // --- EVENT LISTENERS GENERALES ---
@@ -254,15 +291,6 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
 
 
 
