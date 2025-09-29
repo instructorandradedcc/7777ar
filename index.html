@@ -441,7 +441,6 @@
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.id = `model-${asset.id}`;
                 assetItem.setAttribute('src', asset.modelDataUrl);
-                // *** THE FIX IS HERE ***
                 assetItem.setAttribute('response-type', 'arraybuffer');
                 assetsEl.appendChild(assetItem);
             });
@@ -485,9 +484,8 @@
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
             sceneEl.setAttribute('color-space', 'sRGB');
-            sceneEl.setAttribute('renderer', 'colorManagement: true;');
+            sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
 
-            // Move the preloaded assets into the new scene
             const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
             if(preloadedAssets) {
                 sceneEl.appendChild(preloadedAssets); 
@@ -533,7 +531,7 @@
                 sceneEl.remove();
             }
             
-            // Clean up preload container and reset flag
+            arSceneContainer.innerHTML = ''; // Ensure container is empty
             document.getElementById('ar-preload-container').innerHTML = '';
             state.areAssetsPreloaded = false;
 
