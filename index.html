@@ -137,7 +137,8 @@
                     <div class="bg-white p-4 rounded-lg shadow-md mb-4">
                         <p class="text-center">Apunta tu cámara a una de las imágenes de los marcadores. <strong>Puedes girar el modelo 3D deslizando el dedo sobre la pantalla.</strong></p>
                         <div id="ar-status" class="text-center font-mono p-2 bg-gray-100 rounded mt-2 flex justify-center items-center gap-2">
-                            <span id="ar-status-text">Estado: Listo para activar la cámara.</span>
+                            <div class="loader hidden"></div>
+                            <span id="ar-status-text">Estado: Esperando cámara...</span>
                         </div>
                     </div>
                     
@@ -146,7 +147,8 @@
                         <button id="start-ar-btn" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300">Activar Cámara AR</button>
                     </div>
                 </div>
-                <!-- Container for AR Scene -->
+                <!-- Container for AR Scene and preloaded assets -->
+                <div id="ar-preload-container" class="hidden"></div>
                 <div id="ar-scene-container"></div>
                 <div id="ar-active-controls" class="hidden p-4 bg-black bg-opacity-50">
                     <div class="flex justify-center items-center max-w-4xl mx-auto">
@@ -169,6 +171,7 @@
             assets: [],
             currentPage: 'page-upload',
             isArActive: false,
+            areAssetsPreloaded: false,
         };
 
         let editor = {
@@ -462,8 +465,51 @@
                 }
             });
         }
+
+        function preloadARAssets() {
+            if (state.areAssetsPreloaded || state.assets.length === 0) return;
+
+            const arPreloadContainer = document.getElementById('ar-preload-container');
+            arPreloadContainer.innerHTML = ''; 
+
+            const tempScene = document.createElement('a-scene');
+            tempScene.setAttribute('embedded', '');
+            tempScene.style.cssText = 'position:fixed; height:1px; width:1px; top:-9999px; left:-9999px;';
+            
+            const assetsEl = document.createElement('a-assets');
+            assetsEl.setAttribute('timeout', '30000');
+            state.assets.forEach(asset => {
+                const assetItem = document.createElement('a-asset-item');
+                assetItem.id = `model-${asset.id}`;
+                assetItem.setAttribute('src', asset.modelDataUrl);
+                assetsEl.appendChild(assetItem);
+            });
+            
+            const arStatusText = document.getElementById('ar-status-text');
+            const arLoader = document.querySelector('#ar-status .loader');
+            arStatusText.textContent = 'Cargando modelos 3D...';
+            arLoader.classList.remove('hidden');
+
+            assetsEl.addEventListener('loaded', () => {
+                state.areAssetsPreloaded = true;
+                arStatusText.textContent = '¡Recursos listos! Activa la cámara.';
+                arLoader.classList.add('hidden');
+            });
+             assetsEl.addEventListener('timeout', (e) => {
+                arStatusText.textContent = 'Error: La carga de modelos tardó mucho.';
+                 arLoader.classList.add('hidden');
+            });
+
+            tempScene.appendChild(assetsEl);
+            arPreloadContainer.appendChild(tempScene);
+        }
         
         function startAR() {
+            if (!state.areAssetsPreloaded) {
+                alert("Los modelos 3D aún se están cargando. Espera un momento y vuelve a intentarlo.");
+                return;
+            }
+
             const arSceneContainer = document.getElementById('ar-scene-container');
             arSceneContainer.innerHTML = '';
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;`;
@@ -474,6 +520,9 @@
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+            
+            const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
+            if(preloadedAssets) sceneEl.appendChild(preloadedAssets.cloneNode(true));
             
             const cameraEl = document.createElement('a-camera');
             cameraEl.setAttribute('position', '0 0 0');
@@ -488,7 +537,7 @@
                 const finalScale = asset.normalizationFactor * t.scale.x;
 
                 const modelEntity = document.createElement('a-gltf-model');
-                modelEntity.setAttribute('src', asset.modelDataUrl);
+                modelEntity.setAttribute('src', `#model-${asset.id}`);
                 modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
                 modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
                 modelEntity.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
@@ -535,6 +584,9 @@
                      displayAssetInEditor(parseInt(document.getElementById('asset-selector').value) || state.assets[0].id);
                 }
             }
+             if (pageId === 'page-ar') {
+                preloadARAssets();
+            }
             if (pageId !== 'page-ar' && state.isArActive) stopAR();
         }
 
@@ -573,3 +625,4 @@
     </script>
 </body>
 </html>
+
