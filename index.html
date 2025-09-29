@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Creador de Experiencias AR</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,7 +25,7 @@
     <style>
         .page { display: none; }
         .page.active { display: block; }
-        #editor-canvas { width: 100%; height: 400px; border: 1px solid #ccc; background: #f0f0f0; cursor: move; }
+        #editor-canvas { width: 100%; height: 400px; border: 1px solid #ccc; background: #f0f0f0; cursor: move; touch-action: none; }
         #ar-scene-container.ar-active {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9990;
         }
@@ -97,6 +97,15 @@
         <!-- PAGE 2: 3D Editor -->
         <div id="page-editor" class="page bg-white p-6 rounded-lg shadow-md">
              <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Paso 2: Ajustar Modelos 3D</h2>
+             <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 text-sm" role="alert">
+                <p class="font-bold">Controles Táctiles:</p>
+                <ul class="list-disc list-inside mt-1">
+                    <li><strong>Mover Modelo:</strong> Arrastra el modelo con un dedo.</li>
+                    <li><strong>Rotar Modelo:</strong> Gira el modelo con dos dedos.</li>
+                    <li><strong>Orbitar Cámara:</strong> Arrastra el fondo con un dedo.</li>
+                    <li><strong>Zoom:</strong> Pellizca la pantalla con dos dedos.</li>
+                </ul>
+            </div>
             <div class="flex flex-col md:flex-row gap-6">
                 <div class="md:w-1/3">
                     <label for="asset-selector" class="block mb-2 font-medium text-gray-700">Seleccionar Recurso:</label>
@@ -190,24 +199,20 @@
         ];
 
         // --- CUSTOM A-FRAME COMPONENTS ---
-
-        // Component to handle touch rotation of the model
         AFRAME.registerComponent('touch-rotator', {
             schema: {
                 rotationFactor: { type: 'number', default: 2 }
             },
             init: function () {
-                this.targetEntity = this.el.parentEl; // The mindar-image-target
+                this.targetEntity = this.el.parentEl;
                 this.isVisible = false;
                 this.isDragging = false;
                 this.previousDragX = 0;
                 this.previousDragY = 0;
-
                 const canvas = this.el.sceneEl.canvas;
                 canvas.addEventListener('touchstart', this.onTouchStart.bind(this));
                 canvas.addEventListener('touchmove', this.onTouchMove.bind(this));
                 canvas.addEventListener('touchend', this.onTouchEnd.bind(this));
-                
                 this.targetEntity.addEventListener('targetFound', () => { this.isVisible = true; });
                 this.targetEntity.addEventListener('targetLost', () => { this.isVisible = false; });
             },
@@ -222,41 +227,27 @@
                 if (this.isDragging && e.touches.length === 1 && this.isVisible) {
                     const deltaX = e.touches[0].clientX - this.previousDragX;
                     const deltaY = e.touches[0].clientY - this.previousDragY;
-
                     const rotation = this.el.object3D.rotation;
                     rotation.y += THREE.MathUtils.degToRad(deltaX * this.data.rotationFactor);
                     rotation.x += THREE.MathUtils.degToRad(deltaY * this.data.rotationFactor);
-
                     this.previousDragX = e.touches[0].clientX;
                     this.previousDragY = e.touches[0].clientY;
                 }
             },
-            onTouchEnd: function() {
-                this.isDragging = false;
-            }
+            onTouchEnd: function() { this.isDragging = false; }
         });
 
-
         // --- APP FUNCTIONS ---
-
-        // Fetches a URL, using cache if available.
         async function fetchWithCache(url) {
             try {
                 const cache = await caches.open(CACHE_NAME);
                 const cachedResponse = await cache.match(url);
-                if (cachedResponse) {
-                    console.log('Serving from cache:', url);
-                    return cachedResponse;
-                }
-                console.log('Fetching from network:', url);
+                if (cachedResponse) return cachedResponse;
                 const networkResponse = await fetch(url);
-                if (networkResponse.ok) {
-                    await cache.put(url, networkResponse.clone());
-                }
+                if (networkResponse.ok) await cache.put(url, networkResponse.clone());
                 return networkResponse;
             } catch (error) {
-                console.error(`Failed to fetch ${url}:`, error);
-                throw error;
+                console.error(`Failed to fetch ${url}:`, error); throw error;
             }
         }
         
@@ -275,65 +266,44 @@
             container.appendChild(grid);
         }
 
-        // Loads all assets from GitHub
         async function loadAssetsFromGitHub() {
             const loadingStatusDiv = document.getElementById('loading-status');
             const loadingText = document.getElementById('loading-text');
             const progressBar = document.getElementById('loading-progress-bar');
-            
             loadingStatusDiv.classList.remove('hidden');
             document.getElementById('load-from-github-btn').disabled = true;
-
-            const totalAssets = ASSET_NAMES.length * 3; // .mind, .glb, and .jpg for each
+            const totalAssets = ASSET_NAMES.length * 3;
             let loadedCount = 0;
-            
             const promises = ASSET_NAMES.map(async (name, index) => {
-                const markerUrl = `${GITHUB_BASE_URL}markers/${name}.mind`;
-                const modelUrl = `${GITHUB_BASE_URL}modelss/${name}.glb`;
-                const imageUrl = `${GITHUB_BASE_URL}imagenes/${name}.jpg`;
-
-                // Fetch marker
-                const markerResponse = await fetchWithCache(markerUrl);
-                const markerBlob = await markerResponse.blob();
-                loadedCount++;
-                progressBar.style.width = `${(loadedCount / totalAssets) * 100}%`;
-                loadingText.textContent = `Cargando ${name}.mind...`;
-
-                // Fetch model
-                const modelResponse = await fetchWithCache(modelUrl);
-                const modelBlob = await modelResponse.blob();
-                loadedCount++;
-                progressBar.style.width = `${(loadedCount / totalAssets) * 100}%`;
-                loadingText.textContent = `Cargando ${name}.glb...`;
-                
-                // Fetch image
-                const imageResponse = await fetchWithCache(imageUrl);
-                const imageBlob = await imageResponse.blob();
-                loadedCount++;
-                progressBar.style.width = `${(loadedCount / totalAssets) * 100}%`;
-                loadingText.textContent = `Cargando ${name}.jpg...`;
-
+                const urls = {
+                    marker: `${GITHUB_BASE_URL}markers/${name}.mind`,
+                    model: `${GITHUB_BASE_URL}modelss/${name}.glb`,
+                    image: `${GITHUB_BASE_URL}imagenes/${name}.jpg`
+                };
+                const updateProgress = (type) => {
+                    loadedCount++;
+                    progressBar.style.width = `${(loadedCount / totalAssets) * 100}%`;
+                    loadingText.textContent = `Cargando ${name}.${type}...`;
+                };
+                const markerBlob = await (await fetchWithCache(urls.marker)).blob(); updateProgress('mind');
+                const modelBlob = await (await fetchWithCache(urls.model)).blob(); updateProgress('glb');
+                const imageBlob = await (await fetchWithCache(urls.image)).blob(); updateProgress('jpg');
                 return {
                     id: index,
-                    markerDataUrl: URL.createObjectURL(markerBlob),
-                    markerName: `${name}.mind`,
-                    modelDataUrl: URL.createObjectURL(modelBlob),
-                    modelName: `${name}.glb`,
-                    imageDataUrl: URL.createObjectURL(imageBlob),
-                    imageName: `${name}.jpg`,
+                    markerDataUrl: URL.createObjectURL(markerBlob), markerName: `${name}.mind`,
+                    modelDataUrl: URL.createObjectURL(modelBlob), modelName: `${name}.glb`,
+                    imageDataUrl: URL.createObjectURL(imageBlob), imageName: `${name}.jpg`,
                     transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
-                    hasBeenNormalized: false,
-                    normalizationFactor: 1,
+                    hasBeenNormalized: false, normalizationFactor: 1,
                 };
             });
-
             try {
                 state.assets = await Promise.all(promises);
                 loadingText.textContent = '¡Todos los recursos cargados y guardados en caché!';
                 displayLoadedImages(state.assets);
                 document.getElementById('goto-editor-btn').disabled = false;
             } catch (error) {
-                loadingText.textContent = 'Error al cargar los recursos. Revisa la consola para más detalles.';
+                loadingText.textContent = 'Error al cargar los recursos. Revisa la consola.';
                 progressBar.classList.add('bg-red-600');
             }
         }
@@ -342,31 +312,61 @@
             const canvas = document.getElementById('editor-canvas');
             const container = document.getElementById('editor-container');
             if (!canvas || !container || editor.renderer) return;
-
             editor.scene = new THREE.Scene();
             editor.scene.background = new THREE.Color(0xeeeeee);
             editor.camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
             editor.camera.position.set(0, 1, 15);
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 2);
-            editor.scene.add(ambientLight);
+            editor.scene.add(new THREE.AmbientLight(0xffffff, 2));
             const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
             directionalLight.position.set(2, 5, 3);
             editor.scene.add(directionalLight);
-            
             editor.renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
             editor.renderer.setSize(container.clientWidth, container.clientHeight);
             editor.renderer.setPixelRatio(window.devicePixelRatio);
-
             editor.controls = new OrbitControls(editor.camera, editor.renderer.domElement);
             editor.controls.enableDamping = true;
-
-            function animate() { 
-                requestAnimationFrame(animate); 
-                editor.controls.update(); 
-                editor.renderer.render(editor.scene, editor.camera); 
-            }
+            function animate() { requestAnimationFrame(animate); editor.controls.update(); editor.renderer.render(editor.scene, editor.camera); }
             animate();
+            addEditorTouchControls(canvas);
+        }
+
+        function addEditorTouchControls(canvas) {
+            let isTwoFingerRotating = false;
+            let previousAngle = 0;
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2 && editor.currentTarget) {
+                    e.preventDefault();
+                    isTwoFingerRotating = true;
+                    editor.controls.enabled = false;
+                    const dx = e.touches[0].pageX - e.touches[1].pageX;
+                    const dy = e.touches[0].pageY - e.touches[1].pageY;
+                    previousAngle = Math.atan2(dy, dx);
+                }
+            }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => {
+                if (isTwoFingerRotating && e.touches.length === 2 && editor.currentTarget) {
+                    e.preventDefault();
+                    const dx = e.touches[0].pageX - e.touches[1].pageX;
+                    const dy = e.touches[0].pageY - e.touches[1].pageY;
+                    const currentAngle = Math.atan2(dy, dx);
+                    const deltaAngle = currentAngle - previousAngle;
+                    const assetId = parseInt(document.getElementById('asset-selector').value);
+                    const asset = state.assets.find(a => a.id === assetId);
+                    if (!asset) return;
+                    asset.transform.rotation.y += THREE.MathUtils.radToDeg(deltaAngle * 2);
+                    updateModelTransformFromState(asset.transform);
+                    updateTransformInputs(asset.transform);
+                    previousAngle = currentAngle;
+                }
+            }, { passive: false });
+            const endRotation = () => {
+                if (isTwoFingerRotating) {
+                    isTwoFingerRotating = false;
+                    editor.controls.enabled = true;
+                }
+            };
+            canvas.addEventListener('touchend', endRotation);
+            canvas.addEventListener('touchcancel', endRotation);
         }
 
         function populateEditorSelector() {
@@ -393,43 +393,32 @@
         function displayAssetInEditor(assetId) {
             const asset = state.assets.find(a => a.id === assetId);
             if (!asset || !editor.scene) return;
-            
             if (editor.currentTarget) editor.scene.remove(editor.currentTarget);
             if (editor.currentPlane) editor.scene.remove(editor.currentPlane);
             if (editor.dragControls) editor.dragControls.dispose();
-            
             editor.textureLoader.load(asset.imageDataUrl, (texture) => {
                 const aspect = texture.image.width / texture.image.height;
-                const planeWidth = 10;
-                const planeHeight = planeWidth / aspect;
-                const planeGeom = new THREE.PlaneGeometry(planeWidth, planeHeight);
-                const planeMat = new THREE.MeshBasicMaterial({ map: texture });
-                editor.currentPlane = new THREE.Mesh(planeGeom, planeMat);
+                const planeGeom = new THREE.PlaneGeometry(10, 10 / aspect);
+                editor.currentPlane = new THREE.Mesh(planeGeom, new THREE.MeshBasicMaterial({ map: texture }));
                 editor.currentPlane.position.set(0, 0, -0.1);
                 editor.scene.add(editor.currentPlane);
             });
-
             editor.loader.load(asset.modelDataUrl, (gltf) => {
                 editor.currentTarget = gltf.scene;
-                
                 if (!asset.hasBeenNormalized) {
                     const box = new THREE.Box3().setFromObject(editor.currentTarget);
                     const size = box.getSize(new THREE.Vector3());
                     const center = box.getCenter(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    asset.normalizationFactor = 5.0 / maxDim; // Normalize to a size of 5 units
+                    asset.normalizationFactor = 5.0 / Math.max(size.x, size.y, size.z);
                     editor.currentTarget.position.sub(center);
-                    asset.transform.position = { x: 0, y: 0, z: 0 };
-                    asset.transform.rotation = { x: 0, y: 0, z: 0 };
-                    asset.transform.scale = { x: 1, y: 1, z: 1 };
+                    Object.assign(asset.transform, { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } });
                     asset.hasBeenNormalized = true;
                 }
-                
                 editor.scene.add(editor.currentTarget);
                 updateModelTransformFromState(asset.transform);
                 updateTransformInputs(asset.transform);
                 setupDragControls(editor.currentTarget);
-            }, undefined, (error) => console.error("Error loading model:", error));
+            });
         }
             
         function updateModelTransformFromState(transform) {
@@ -437,9 +426,7 @@
             const assetId = parseInt(document.getElementById('asset-selector').value);
             const asset = state.assets.find(a => a.id === assetId);
             if (!asset || !asset.normalizationFactor) return;
-
             const finalScale = transform.scale.x * asset.normalizationFactor;
-            
             editor.currentTarget.position.set(transform.position.x, transform.position.y, transform.position.z);
             editor.currentTarget.rotation.set(
                 THREE.MathUtils.degToRad(transform.rotation.x),
@@ -457,10 +444,8 @@
                 const assetId = parseInt(document.getElementById('asset-selector').value);
                 const asset = state.assets.find(a => a.id === assetId);
                 if (asset) {
-                    const newPos = event.object.position;
-                    asset.transform.position.x = newPos.x;
-                    asset.transform.position.y = newPos.y;
-                    asset.transform.position.z = newPos.z;
+                    const { x, y, z } = event.object.position;
+                    Object.assign(asset.transform.position, { x, y, z });
                     updateTransformInputs(asset.transform);
                 }
             });
@@ -468,14 +453,11 @@
 
         function preloadARAssets() {
             if (state.areAssetsPreloaded || state.assets.length === 0) return;
-
             const arPreloadContainer = document.getElementById('ar-preload-container');
             arPreloadContainer.innerHTML = ''; 
-
             const tempScene = document.createElement('a-scene');
             tempScene.setAttribute('embedded', '');
             tempScene.style.cssText = 'position:fixed; height:1px; width:1px; top:-9999px; left:-9999px;';
-            
             const assetsEl = document.createElement('a-assets');
             assetsEl.setAttribute('timeout', '30000');
             state.assets.forEach(asset => {
@@ -484,69 +466,62 @@
                 assetItem.setAttribute('src', asset.modelDataUrl);
                 assetsEl.appendChild(assetItem);
             });
-            
             const arStatusText = document.getElementById('ar-status-text');
             const arLoader = document.querySelector('#ar-status .loader');
             arStatusText.textContent = 'Cargando modelos 3D...';
             arLoader.classList.remove('hidden');
-
             assetsEl.addEventListener('loaded', () => {
                 state.areAssetsPreloaded = true;
                 arStatusText.textContent = '¡Recursos listos! Activa la cámara.';
                 arLoader.classList.add('hidden');
             });
-             assetsEl.addEventListener('timeout', (e) => {
+            assetsEl.addEventListener('timeout', () => {
                 arStatusText.textContent = 'Error: La carga de modelos tardó mucho.';
-                 arLoader.classList.add('hidden');
+                arLoader.classList.add('hidden');
             });
-
             tempScene.appendChild(assetsEl);
             arPreloadContainer.appendChild(tempScene);
         }
         
         function startAR() {
             if (!state.areAssetsPreloaded) {
-                alert("Los modelos 3D aún se están cargando. Espera un momento y vuelve a intentarlo.");
+                alert("Los modelos 3D aún se están cargando. Espera y vuelve a intentarlo.");
                 return;
             }
-
             const arSceneContainer = document.getElementById('ar-scene-container');
             arSceneContainer.innerHTML = '';
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;`;
-            
             const sceneEl = document.createElement('a-scene');
             sceneEl.setAttribute('mindar-image', mindARSettings);
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
-            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true'); // Correctly set to true for permission prompt
             
+            // CORRECTED: Move the original assets element, don't clone it.
             const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
-            if(preloadedAssets) sceneEl.appendChild(preloadedAssets.cloneNode(true));
-            
+            if(preloadedAssets) {
+                sceneEl.appendChild(preloadedAssets);
+            }
+
             const cameraEl = document.createElement('a-camera');
             cameraEl.setAttribute('position', '0 0 0');
             cameraEl.setAttribute('look-controls', 'enabled: false');
             sceneEl.appendChild(cameraEl);
-
             state.assets.forEach((asset, index) => {
                 const targetEl = document.createElement('a-entity');
                 targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
-                
                 const t = asset.transform;
-                const finalScale = asset.normalizationFactor * t.scale.x;
-
+                const finalScale = t.scale.x * asset.normalizationFactor;
                 const modelEntity = document.createElement('a-gltf-model');
                 modelEntity.setAttribute('src', `#model-${asset.id}`);
                 modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
                 modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
                 modelEntity.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
                 modelEntity.setAttribute('touch-rotator', '');
-                
                 targetEl.appendChild(modelEntity);
                 sceneEl.appendChild(targetEl);
             });
-
             arSceneContainer.appendChild(sceneEl);
             arSceneContainer.classList.add('ar-active');
             document.getElementById('ar-ui-container').classList.add('hidden');
@@ -557,14 +532,15 @@
         function stopAR() {
             const arSceneContainer = document.getElementById('ar-scene-container');
             const sceneEl = arSceneContainer.querySelector('a-scene');
-            if (sceneEl && sceneEl.hasLoaded) {
-                 if (sceneEl.systems['mindar-image']) {
-                    sceneEl.systems['mindar-image'].stop();
-                }
+            if (sceneEl && sceneEl.hasLoaded && sceneEl.systems['mindar-image']) {
+                sceneEl.systems['mindar-image'].stop();
                 sceneEl.parentNode.removeChild(sceneEl);
             }
             arSceneContainer.innerHTML = '';
-            
+            // Also clear the preload container to allow for fresh preloading next time
+            document.getElementById('ar-preload-container').innerHTML = '';
+            state.areAssetsPreloaded = false;
+
             arSceneContainer.classList.remove('ar-active');
             document.getElementById('ar-ui-container').classList.remove('hidden');
             document.getElementById('ar-active-controls').classList.add('hidden');
@@ -575,49 +551,36 @@
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
             state.currentPage = pageId;
-
             if (pageId === 'page-editor' && !editor.renderer) initEditor();
-            
             if (pageId === 'page-editor') {
                 populateEditorSelector();
                 if (state.assets.length > 0) {
                      displayAssetInEditor(parseInt(document.getElementById('asset-selector').value) || state.assets[0].id);
                 }
             }
-             if (pageId === 'page-ar') {
-                preloadARAssets();
-            }
+            if (pageId === 'page-ar') preloadARAssets();
             if (pageId !== 'page-ar' && state.isArActive) stopAR();
         }
 
         // --- INITIALIZATION & EVENT LISTENERS ---
-        
         document.getElementById('load-from-github-btn').addEventListener('click', loadAssetsFromGitHub);
-        
-        // Navigation
         document.getElementById('goto-editor-btn').addEventListener('click', () => navigateTo('page-editor'));
         document.getElementById('goto-ar-btn').addEventListener('click', () => navigateTo('page-ar'));
         document.getElementById('back-to-upload-btn').addEventListener('click', () => navigateTo('page-upload'));
         document.getElementById('back-to-editor-btn-pre').addEventListener('click', () => navigateTo('page-editor'));
         document.getElementById('start-ar-btn').addEventListener('click', startAR);
         document.getElementById('stop-ar-btn').addEventListener('click', stopAR);
-
-        // Editor logic
-        const assetSelector = document.getElementById('asset-selector');
-        assetSelector.addEventListener('change', (e) => displayAssetInEditor(parseInt(e.target.value)));
+        document.getElementById('asset-selector').addEventListener('change', (e) => displayAssetInEditor(parseInt(e.target.value)));
         
-        const transformInputs = ['pos-x', 'pos-y', 'pos-z', 'rot-x', 'rot-y', 'rot-z', 'scale'];
-        transformInputs.forEach(id => {
+        ['pos-x', 'pos-y', 'pos-z', 'rot-x', 'rot-y', 'rot-z', 'scale'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
-                const assetId = parseInt(assetSelector.value);
+                const assetId = parseInt(document.getElementById('asset-selector').value);
                 const asset = state.assets.find(a => a.id === assetId);
                 if (!asset || !editor.currentTarget) return;
-                
                 asset.transform.position = { x: parseFloat(document.getElementById('pos-x').value), y: parseFloat(document.getElementById('pos-y').value), z: parseFloat(document.getElementById('pos-z').value) };
                 asset.transform.rotation = { x: parseFloat(document.getElementById('rot-x').value), y: parseFloat(document.getElementById('rot-y').value), z: parseFloat(document.getElementById('rot-z').value) };
                 const scaleVal = parseFloat(document.getElementById('scale').value);
                 asset.transform.scale = { x: scaleVal, y: scaleVal, z: scaleVal };
-                
                 updateModelTransformFromState(asset.transform);
             });
         });
@@ -625,4 +588,5 @@
     </script>
 </body>
 </html>
+
 
