@@ -466,27 +466,11 @@
             arPreloadContainer.appendChild(tempScene);
         }
         
-        async function startAR() {
+        function startAR() {
             if (!state.areAssetsPreloaded) {
                 const arStatusText = document.getElementById('ar-status-text');
                 arStatusText.textContent = 'Error: Los modelos 3D no están listos. Vuelve atrás y recárgalos.';
                 return;
-            }
-
-            // CORRECCIÓN PARA CELULARES: Solicitar permiso de cámara explícitamente.
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                // Si obtenemos permiso, detenemos los tracks para que MindAR pueda usar la cámara.
-                stream.getTracks().forEach(track => track.stop());
-            } catch (err) {
-                console.error("Error al acceder a la cámara: ", err);
-                const arStatusText = document.getElementById('ar-status-text');
-                if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-                    arStatusText.textContent = 'Permiso de cámara denegado. Revísalo en los ajustes de tu navegador.';
-                } else {
-                    arStatusText.textContent = 'No se pudo acceder a la cámara.';
-                }
-                return; // No continuar si no hay permiso.
             }
 
             const arSceneContainer = document.getElementById('ar-scene-container');
@@ -497,9 +481,11 @@
             document.getElementById('app').classList.add('ar-fullscreen');
             
             const sceneEl = document.createElement('a-scene');
+            // autoStart: false es clave. La cámara se iniciará con .start() después de que la escena cargue.
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
             sceneEl.setAttribute('mindar-image', mindARSettings);
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+            // Este componente maneja la solicitud de permisos en iOS y otros dispositivos.
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true');
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
@@ -529,7 +515,10 @@
                 sceneEl.appendChild(targetEl);
             });
 
+            // Esperamos a que la escena esté completamente lista en el DOM.
             sceneEl.addEventListener('loaded', () => {
+                // El sistema MindAR ya está disponible y su método .start() solicitará la cámara.
+                // Como esto ocurre después de un clic de usuario, el navegador lo permitirá.
                 sceneEl.systems['mindar-image'].start();
             });
 
