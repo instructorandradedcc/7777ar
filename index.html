@@ -466,11 +466,27 @@
             arPreloadContainer.appendChild(tempScene);
         }
         
-        function startAR() {
+        async function startAR() {
             if (!state.areAssetsPreloaded) {
                 const arStatusText = document.getElementById('ar-status-text');
                 arStatusText.textContent = 'Error: Los modelos 3D no están listos. Vuelve atrás y recárgalos.';
                 return;
+            }
+
+            // CORRECCIÓN PARA CELULARES: Solicitar permiso de cámara explícitamente.
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                // Si obtenemos permiso, detenemos los tracks para que MindAR pueda usar la cámara.
+                stream.getTracks().forEach(track => track.stop());
+            } catch (err) {
+                console.error("Error al acceder a la cámara: ", err);
+                const arStatusText = document.getElementById('ar-status-text');
+                if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+                    arStatusText.textContent = 'Permiso de cámara denegado. Revísalo en los ajustes de tu navegador.';
+                } else {
+                    arStatusText.textContent = 'No se pudo acceder a la cámara.';
+                }
+                return; // No continuar si no hay permiso.
             }
 
             const arSceneContainer = document.getElementById('ar-scene-container');
@@ -516,11 +532,6 @@
             sceneEl.addEventListener('loaded', () => {
                 sceneEl.systems['mindar-image'].start();
             });
-
-            // CORRECCIÓN: Se eliminan los listeners que muestran la caja de escaneo
-            // sceneEl.addEventListener('arReady', () => document.getElementById('scanning-ui').classList.remove('hidden'));
-            // sceneEl.addEventListener('targetFound', () => document.getElementById('scanning-ui').classList.add('hidden'));
-            // sceneEl.addEventListener('targetLost', () => document.getElementById('scanning-ui').classList.remove('hidden'));
 
             arSceneContainer.appendChild(sceneEl);
             document.getElementById('ar-ui-container').classList.add('hidden');
