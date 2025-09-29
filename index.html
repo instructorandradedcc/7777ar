@@ -168,7 +168,7 @@
                          <button id="back-to-editor-btn-post" class="bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-300">Volver al Editor</button>
                          <button id="stop-ar-btn" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition duration-300">Detener Cámara</button>
                          <button id="fullscreen-ar-btn" title="Pantalla Completa" class="absolute right-0 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 text-white p-2 rounded-full hover:bg-opacity-60">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                              </svg>
                          </button>
@@ -179,7 +179,8 @@
     </div>
     
     <script type="module">
-    import * as THREE from 'three';
+    // CORRECCIÓN: Se usa la instancia de THREE que provee A-Frame para evitar duplicados.
+    const THREE = window.AFRAME.THREE;
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DragControls } from 'three/addons/controls/DragControls.js';
@@ -423,9 +424,51 @@
             editor.currentTarget.scale.set(finalScale, finalScale, finalScale);
         }
         
+        // CORRECCIÓN: Esta función ahora solo construye la escena y la deja lista.
+        function buildARScene() {
+            const arSceneContainer = document.getElementById('ar-scene-container');
+            arSceneContainer.innerHTML = ''; // Limpiar escena previa
+
+            const sceneEl = document.createElement('a-scene');
+            const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
+            
+            sceneEl.setAttribute('mindar-image', mindARSettings);
+            sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true');
+            sceneEl.setAttribute('color-space', 'sRGB');
+            sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
+            sceneEl.style.display = 'none'; // Se mantiene oculta hasta que se presione "start"
+
+            const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
+            if (preloadedAssets) {
+                sceneEl.appendChild(preloadedAssets.cloneNode(true));
+            }
+
+            const cameraEl = document.createElement('a-camera');
+            cameraEl.setAttribute('position', '0 0 0');
+            cameraEl.setAttribute('look-controls', 'enabled: false');
+            sceneEl.appendChild(cameraEl);
+
+            state.assets.forEach((asset, index) => {
+                const targetEl = document.createElement('a-entity');
+                targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
+                const t = asset.transform;
+                const finalScale = t.scale.x * asset.normalizationFactor;
+                const modelEntity = document.createElement('a-gltf-model');
+                modelEntity.setAttribute('src', `#model-${asset.id}`);
+                modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
+                modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
+                modelEntity.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
+                modelEntity.setAttribute('touch-rotator', '');
+                targetEl.appendChild(modelEntity);
+                sceneEl.appendChild(targetEl);
+            });
+            arSceneContainer.appendChild(sceneEl);
+        }
+
         function preloadARAssets() {
             if (state.areAssetsPreloaded || state.assets.length === 0) return;
-            state.areAssetsPreloaded = false; // Reset in case of re-navigation
+            state.areAssetsPreloaded = false;
             
             const arPreloadContainer = document.getElementById('ar-preload-container');
             arPreloadContainer.innerHTML = ''; 
@@ -454,6 +497,7 @@
                 state.areAssetsPreloaded = true;
                 arStatusText.textContent = '¡Recursos listos! Activa la cámara.';
                 arLoader.classList.add('hidden');
+                buildARScene(); // Construir la escena una vez que los assets están listos
             });
 
             assetsEl.addEventListener('timeout', (e) => {
@@ -466,65 +510,29 @@
             arPreloadContainer.appendChild(tempScene);
         }
         
+        // CORRECCIÓN: Esta función ahora solo busca la escena pre-construida y la inicia.
         function startAR() {
-            if (!state.areAssetsPreloaded) {
-                const arStatusText = document.getElementById('ar-status-text');
-                arStatusText.textContent = 'Error: Los modelos 3D no están listos. Vuelve atrás y recárgalos.';
+            const arSceneContainer = document.getElementById('ar-scene-container');
+            const sceneEl = arSceneContainer.querySelector('a-scene');
+
+            if (!sceneEl || !sceneEl.systems['mindar-image']) {
+                console.error("AR Scene or MindAR System not ready. Attempting to rebuild.");
+                document.getElementById('ar-status-text').textContent = 'Error: La escena AR no está lista. Intenta de nuevo.';
+                // Como fallback, intentamos reconstruir por si algo falló
+                if (state.areAssetsPreloaded) buildARScene();
                 return;
             }
 
-            const arSceneContainer = document.getElementById('ar-scene-container');
-            arSceneContainer.innerHTML = '';
+            // Mostrar la escena y los controles
+            sceneEl.style.display = 'block';
             arSceneContainer.classList.add('ar-active');
-            
             document.body.classList.add('ar-active');
             document.getElementById('app').classList.add('ar-fullscreen');
-            
-            const sceneEl = document.createElement('a-scene');
-            // autoStart: false es clave. La cámara se iniciará con .start() después de que la escena cargue.
-            const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
-            sceneEl.setAttribute('mindar-image', mindARSettings);
-            sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
-            // Este componente maneja la solicitud de permisos en iOS y otros dispositivos.
-            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true');
-            sceneEl.setAttribute('color-space', 'sRGB');
-            sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
-
-            const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
-            if(preloadedAssets) {
-                sceneEl.appendChild(preloadedAssets); 
-            }
-
-            const cameraEl = document.createElement('a-camera');
-            cameraEl.setAttribute('position', '0 0 0');
-            cameraEl.setAttribute('look-controls', 'enabled: false');
-            sceneEl.appendChild(cameraEl);
-
-            state.assets.forEach((asset, index) => {
-                const targetEl = document.createElement('a-entity');
-                targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
-                const t = asset.transform;
-                const finalScale = t.scale.x * asset.normalizationFactor;
-                const modelEntity = document.createElement('a-gltf-model');
-                modelEntity.setAttribute('src', `#model-${asset.id}`);
-                modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
-                modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
-                modelEntity.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
-                modelEntity.setAttribute('touch-rotator', '');
-                targetEl.appendChild(modelEntity);
-                sceneEl.appendChild(targetEl);
-            });
-
-            // Esperamos a que la escena esté completamente lista en el DOM.
-            sceneEl.addEventListener('loaded', () => {
-                // El sistema MindAR ya está disponible y su método .start() solicitará la cámara.
-                // Como esto ocurre después de un clic de usuario, el navegador lo permitirá.
-                sceneEl.systems['mindar-image'].start();
-            });
-
-            arSceneContainer.appendChild(sceneEl);
             document.getElementById('ar-ui-container').classList.add('hidden');
             document.getElementById('ar-active-controls').classList.remove('hidden');
+            
+            // Iniciar la cámara y el sistema AR
+            sceneEl.systems['mindar-image'].start();
             state.isArActive = true;
         }
 
@@ -541,14 +549,15 @@
             
             arSceneContainer.innerHTML = '';
             arSceneContainer.classList.remove('ar-active');
-            document.getElementById('ar-preload-container').innerHTML = '';
-            state.areAssetsPreloaded = false;
+            
+            // No limpiar el preloader, ya que podríamos volver a esta página.
+            // document.getElementById('ar-preload-container').innerHTML = '';
+            // state.areAssetsPreloaded = false;
 
             document.body.classList.remove('ar-active');
             document.getElementById('app').classList.remove('ar-fullscreen');
             document.getElementById('ar-ui-container').classList.remove('hidden');
             document.getElementById('ar-active-controls').classList.add('hidden');
-            document.getElementById('scanning-ui').classList.add('hidden');
             state.isArActive = false;
         }
         
@@ -572,7 +581,10 @@
                      displayAssetInEditor(parseInt(document.getElementById('asset-selector').value) || 0);
                 }
             } else if (pageId === 'page-ar') {
-                preloadARAssets();
+                // Solo precargamos si no se ha hecho antes
+                if (!state.areAssetsPreloaded) {
+                    preloadARAssets();
+                }
             }
 
             if (pageId !== 'page-ar' && state.isArActive) {
@@ -668,8 +680,6 @@
     </script>
 </body>
 </html>
-
-
 
 
 
