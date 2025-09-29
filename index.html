@@ -464,6 +464,7 @@
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.id = `model-${asset.id}`;
                 assetItem.setAttribute('src', asset.modelDataUrl);
+                assetItem.setAttribute('response-type', 'arraybuffer'); // <-- THE FIX
                 assetsEl.appendChild(assetItem);
             });
             const arStatusText = document.getElementById('ar-status-text');
@@ -496,9 +497,8 @@
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
-            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true'); // Correctly set to true for permission prompt
+            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true');
             
-            // CORRECTED: Move the original assets element, don't clone it.
             const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
             if(preloadedAssets) {
                 sceneEl.appendChild(preloadedAssets);
@@ -537,7 +537,6 @@
                 sceneEl.parentNode.removeChild(sceneEl);
             }
             arSceneContainer.innerHTML = '';
-            // Also clear the preload container to allow for fresh preloading next time
             document.getElementById('ar-preload-container').innerHTML = '';
             state.areAssetsPreloaded = false;
 
@@ -588,5 +587,7 @@
     </script>
 </body>
 </html>
+
+
 
 
