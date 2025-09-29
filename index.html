@@ -473,7 +473,7 @@
             }
 
             const arSceneContainer = document.getElementById('ar-scene-container');
-            if (arSceneContainer.querySelector('a-scene')) return;
+            arSceneContainer.innerHTML = ''; // Clear previous scene if any
             
             document.body.classList.add('ar-active');
             document.getElementById('app').classList.add('ar-fullscreen');
@@ -482,7 +482,8 @@
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;`;
             sceneEl.setAttribute('mindar-image', mindARSettings);
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
-            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+            // THIS IS THE FIX FOR CAMERA PERMISSIONS
+            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true');
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
 
@@ -531,7 +532,7 @@
                 sceneEl.remove();
             }
             
-            arSceneContainer.innerHTML = ''; // Ensure container is empty
+            arSceneContainer.innerHTML = '';
             document.getElementById('ar-preload-container').innerHTML = '';
             state.areAssetsPreloaded = false;
 
