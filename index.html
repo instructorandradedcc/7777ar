@@ -44,12 +44,6 @@
             height: 40px;
             animation: spin 1s linear infinite;
         }
-        #fullscreen-loader {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.7);
-            z-index: 10000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
         #scanning-ui {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 9991;
@@ -68,11 +62,6 @@
 </head>
 <body class="bg-gray-200 text-gray-800 font-sans">
     
-    <div id="fullscreen-loader" class="hidden">
-        <div class="loader"></div>
-        <p id="fullscreen-loader-text" class="text-white text-lg mt-4">Iniciando aplicación...</p>
-    </div>
-
     <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
         <div class="flex justify-center items-center mb-6">
              <img src="asetss/logofundacion.jpg" alt="Logo Fundación" class="h-20 mr-4" onerror="this.onerror=null;this.src='https://placehold.co/80x80/e2e8f0/94a3b8?text=Logo';">
@@ -672,6 +661,7 @@
     </script>
 </body>
 </html>
+
 
 
 
