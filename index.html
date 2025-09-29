@@ -622,12 +622,6 @@
         }
         
         async function initializeApp() {
-            const loader = document.getElementById('fullscreen-loader');
-            const loaderText = document.getElementById('fullscreen-loader-text');
-
-            loader.classList.remove('hidden');
-            loaderText.textContent = 'Verificando recursos en caché...';
-
             const successfullyLoadedFromCache = await loadAssetsFromCacheOnStartup();
 
             if (successfullyLoadedFromCache) {
@@ -647,8 +641,6 @@
                     welcomeText.textContent = 'Presiona el botón para descargar los recursos por primera vez. Se guardarán en la caché para futuras visitas.';
                 }
             }
-
-            loader.classList.add('hidden');
         }
 
         document.getElementById('load-from-github-btn').addEventListener('click', loadAssetsFromGitHub);
@@ -680,6 +672,7 @@
     </script>
 </body>
 </html>
+
 
 
 
