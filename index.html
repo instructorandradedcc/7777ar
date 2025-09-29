@@ -179,7 +179,7 @@
                          <button id="back-to-editor-btn-post" class="bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-300">Volver al Editor</button>
                          <button id="stop-ar-btn" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition duration-300">Detener Cámara</button>
                          <button id="fullscreen-ar-btn" title="Pantalla Completa" class="absolute right-0 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 text-white p-2 rounded-full hover:bg-opacity-60">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                              </svg>
                          </button>
@@ -435,28 +435,55 @@
         }
         
         function preloadARAssets() {
-            if (state.areAssetsPreloaded) return;
-            state.areAssetsPreloaded = true;
+            if (state.areAssetsPreloaded || state.assets.length === 0) return;
+            state.areAssetsPreloaded = false; // Reset in case of re-navigation
             
-            let sceneEl = document.querySelector('a-scene');
-            if (!sceneEl) {
-                sceneEl = document.createElement('a-scene');
-                sceneEl.style.display = 'none';
-                document.body.appendChild(sceneEl);
-            }
-
+            const arPreloadContainer = document.getElementById('ar-preload-container');
+            arPreloadContainer.innerHTML = ''; 
+            
+            const tempScene = document.createElement('a-scene');
+            tempScene.setAttribute('embedded', '');
+            tempScene.style.cssText = 'position:fixed; height:1px; width:1px; top:-9999px; left:-9999px;';
+            
             const assetsEl = document.createElement('a-assets');
             assetsEl.setAttribute('timeout', '30000');
+
             state.assets.forEach(asset => {
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.id = `model-${asset.id}`;
                 assetItem.setAttribute('src', asset.modelDataUrl);
+                // *** THE FIX IS HERE ***
+                assetItem.setAttribute('response-type', 'arraybuffer');
                 assetsEl.appendChild(assetItem);
             });
-            sceneEl.appendChild(assetsEl);
+            
+            const arStatusText = document.getElementById('ar-status-text');
+            const arLoader = document.querySelector('#ar-status .loader');
+            arStatusText.textContent = 'Cargando modelos 3D...';
+            arLoader.classList.remove('hidden');
+
+            assetsEl.addEventListener('loaded', () => {
+                state.areAssetsPreloaded = true;
+                arStatusText.textContent = '¡Recursos listos! Activa la cámara.';
+                arLoader.classList.add('hidden');
+            });
+
+            assetsEl.addEventListener('timeout', (e) => {
+                arStatusText.textContent = 'Error: La carga de modelos tardó mucho.';
+                arLoader.classList.add('hidden');
+                console.error("Asset loading timed out:", e.detail.src);
+            });
+
+            tempScene.appendChild(assetsEl);
+            arPreloadContainer.appendChild(tempScene);
         }
         
         function startAR() {
+            if (!state.areAssetsPreloaded) {
+                alert("Los modelos 3D aún se están cargando. Espera y vuelve a intentarlo.");
+                return;
+            }
+
             const arSceneContainer = document.getElementById('ar-scene-container');
             if (arSceneContainer.querySelector('a-scene')) return;
             
@@ -470,6 +497,12 @@
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true;');
+
+            // Move the preloaded assets into the new scene
+            const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
+            if(preloadedAssets) {
+                sceneEl.appendChild(preloadedAssets); 
+            }
 
             const cameraEl = document.createElement('a-camera');
             cameraEl.setAttribute('position', '0 0 0');
@@ -502,11 +535,19 @@
         }
 
         function stopAR() {
-            const sceneEl = document.querySelector('#ar-scene-container a-scene');
+            const arSceneContainer = document.getElementById('ar-scene-container');
+            const sceneEl = arSceneContainer.querySelector('a-scene');
             if (sceneEl) {
-                sceneEl.systems['mindar-image']?.stop();
+                if(sceneEl.hasLoaded && sceneEl.systems['mindar-image']) {
+                    sceneEl.systems['mindar-image'].stop();
+                }
                 sceneEl.remove();
             }
+            
+            // Clean up preload container and reset flag
+            document.getElementById('ar-preload-container').innerHTML = '';
+            state.areAssetsPreloaded = false;
+
             document.body.classList.remove('ar-active');
             document.getElementById('app').classList.remove('ar-fullscreen');
             document.getElementById('ar-ui-container').classList.remove('hidden');
@@ -536,6 +577,10 @@
                 }
             } else if (pageId === 'page-ar') {
                 preloadARAssets();
+            }
+
+            if (pageId !== 'page-ar' && state.isArActive) {
+                stopAR();
             }
         }
 
@@ -603,7 +648,6 @@
                 }
             }
 
-            // Always hide the fullscreen loader after the check is complete
             loader.classList.add('hidden');
         }
 
