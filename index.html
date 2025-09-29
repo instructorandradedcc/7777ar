@@ -6,9 +6,8 @@
     <title>Ecobook AR</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- A-Frame -->
+    <!-- A-Frame y MindAR (en el head para carga correcta) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <!-- MindAR para A-Frame -->
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
@@ -22,7 +21,8 @@
 
     <!-- Pantalla de Bienvenida -->
     <div id="welcome-screen" class="fixed inset-0 z-30 flex flex-col justify-center items-center text-center bg-gradient-to-br from-indigo-600 to-purple-800 text-white p-6 transition-opacity duration-500 ease-in-out">
-        <img src="./assets/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
+        <!-- RUTA CORREGIDA: Apunta a la carpeta /asetss/ -->
+        <img src="./asetss/logofundacion.jpg" alt="Logo Fundación" class="h-24 mb-6 rounded-xl shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/96x96/e2e8f0/94a3b8?text=Logo';">
         <h1 class="text-4xl font-bold mb-2">Ecobook AR</h1>
         <p class="text-lg max-w-md mb-8">Presiona el botón para activar tu cámara y apunta hacia las imágenes del libro para darles vida.</p>
         
@@ -33,7 +33,7 @@
         <p id="loading-details" class="mt-4 text-sm text-gray-200 h-10">Preparando la experiencia...</p>
     </div>
 
-    <!-- Pantalla de Carga Intermedia (al pedir permiso de cámara) -->
+    <!-- Pantalla de Carga Intermedia -->
     <div id="loading-screen" class="hidden fixed inset-0 z-50 flex flex-col justify-center items-center text-center bg-gray-900 bg-opacity-90 text-white p-6">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
         <h2 class="text-2xl font-bold mb-2">Activando Cámara</h2>
@@ -58,7 +58,7 @@
         </a-scene>
     </div>
     
-    <!-- Controles cuando la AR está activa -->
+    <!-- Controles AR -->
     <div id="ar-active-controls" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-20">
          <button id="stop-ar-btn" class="bg-red-500 text-white font-bold py-3 px-6 rounded-full hover:bg-red-600 transition duration-300 shadow-xl">Detener Cámara</button>
     </div>
@@ -109,7 +109,8 @@
 
         // --- ESTADO Y CONFIGURACIÓN ---
         const state = { isArActive: false, assets: [], };
-        const BASE_URL = './assets/';  // Corregido: assets en lugar de asetss
+        // RUTA CORREGIDA: Apunta a la carpeta /asetss/
+        const BASE_URL = './asetss/';
         const ASSETS_CONFIG = [
             { name: 'botellytaazul', scale: 0.5 }, { name: 'ecoladrillo', scale: 0.5 }, { name: 'lataplateada', scale: 0.5 },
             { name: 'papelitoverde', scale: 0.5 }, { name: 'senorcontenedor', scale: 0.5 }, { name: 'taparoja', scale: 0.5 },
@@ -117,7 +118,8 @@
         state.assets = ASSETS_CONFIG.map((config, index) => ({
             id: index,
             markerUrl: `${BASE_URL}markers/${config.name}.mind`,
-            modelUrl: `${BASE_URL}models/${config.name}.glb`,  // Corregido: models en lugar de modelss
+            // RUTA CORREGIDA: Apunta a la subcarpeta /modelss/
+            modelUrl: `${BASE_URL}modelss/${config.name}.glb`,
             transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: config.scale }
         }));
         
@@ -154,7 +156,7 @@
             stopAR();
         }
         
-        // --- LÓGICA DE AR (PARADA) ---
+        // --- LÓGICA DE AR ---
         function stopAR() {
             if (state.isArActive) {
                 const mindarSystem = arSceneEl.systems['mindar-image'];
@@ -169,16 +171,11 @@
             state.isArActive = false;
         }
 
-        // --- FUNCIÓN PARA CARGAR ASSETS ---
         const loadAssets = () => {
             return new Promise((resolve, reject) => {
                 let loadedCount = 0;
                 const totalAssets = state.assets.length;
-                
-                if (totalAssets === 0) {
-                    resolve();
-                    return;
-                }
+                if (totalAssets === 0) return resolve();
                 
                 state.assets.forEach((asset) => {
                     const assetItem = document.createElement('a-asset-item');
@@ -188,25 +185,16 @@
                     assetItem.addEventListener('loaded', () => {
                         loadedCount++;
                         loadingDetails.textContent = `Cargando modelos... ${loadedCount}/${totalAssets}`;
-                        if (loadedCount === totalAssets) {
-                            resolve();
-                        }
+                        if (loadedCount === totalAssets) resolve();
                     });
-                    
-                    assetItem.addEventListener('error', (e) => {
-                        console.error(`Error cargando ${asset.modelUrl}:`, e);
-                        reject(new Error(`Error al cargar el modelo ${asset.name}`));
-                    });
-                    
+                    assetItem.addEventListener('error', (e) => reject(new Error(`Error al cargar el modelo ${asset.name}`)));
                     arAssetsEl.appendChild(assetItem);
                 });
             });
         };
 
-        // --- FUNCIÓN PRINCIPAL DE CONFIGURACIÓN ---
         const setupARExperience = async () => {
             try {
-                loadingDetails.textContent = 'Iniciando carga de recursos...';
                 await loadAssets();
                 
                 loadingDetails.textContent = 'Configurando escena AR...';
@@ -217,7 +205,6 @@
                     const targetEl = document.createElement('a-entity');
                     targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
                     targetEl.setAttribute('target-interaction', '');
-                    
                     const t = asset.transform;
                     const modelEntity = document.createElement('a-gltf-model');
                     modelEntity.setAttribute('src', `#model-${asset.id}`);
@@ -225,7 +212,6 @@
                     modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
                     modelEntity.setAttribute('scale', `${t.scale} ${t.scale} ${t.scale}`);
                     modelEntity.setAttribute('animation-mixer', '');
-                    
                     targetEl.appendChild(modelEntity);
                     arSceneEl.appendChild(targetEl);
                 });
@@ -244,16 +230,13 @@
                 startBtn.addEventListener('click', async () => {
                     welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
                     loadingScreen.classList.remove('hidden');
-                    
                     try {
                         const mindarSystem = arSceneEl.systems['mindar-image'];
                         await mindarSystem.start();
-                        
                         arSceneEl.style.display = 'block';
                         arActiveControls.classList.remove('hidden');
                         state.isArActive = true;
                     } catch (err) {
-                        console.error("Fallo al iniciar AR:", err);
                         let message = "No se pudo iniciar la cámara. Asegúrate de haberle dado permisos.";
                         if (err.name === 'NotFoundError' || err.name === 'TrackStartError') { 
                             message = "No se encontró una cámara compatible."; 
@@ -266,9 +249,7 @@
                         loadingScreen.classList.add('hidden');
                     }
                 });
-
             } catch (error) {
-                console.error("Error en configuración:", error);
                 showError("Error al configurar la experiencia AR: " + error.message);
             }
         };
@@ -283,6 +264,7 @@
     </script>
 </body>
 </html>
+
 
 
 
