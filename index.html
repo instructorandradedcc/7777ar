@@ -468,23 +468,25 @@
         
         function startAR() {
             if (!state.areAssetsPreloaded) {
-                alert("Los modelos 3D aún se están cargando. Espera y vuelve a intentarlo.");
+                const arStatusText = document.getElementById('ar-status-text');
+                arStatusText.textContent = 'Error: Los modelos 3D no están listos. Vuelve atrás y recárgalos.';
                 return;
             }
 
             const arSceneContainer = document.getElementById('ar-scene-container');
-            arSceneContainer.innerHTML = ''; // Clear previous scene if any
-            arSceneContainer.classList.add('ar-active'); // CORRECCIÓN: Aplicar la clase para pantalla completa
+            arSceneContainer.innerHTML = '';
+            arSceneContainer.classList.add('ar-active');
             
             document.body.classList.add('ar-active');
             document.getElementById('app').classList.add('ar-fullscreen');
             
             const sceneEl = document.createElement('a-scene');
-            const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;`;
+            // CAMBIO 1: autoStart se establece en false. Iniciaremos la cámara manualmente.
+            const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
             sceneEl.setAttribute('mindar-image', mindARSettings);
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
-            // CORRECCIÓN: Se establece en 'false'. MindAR maneja el permiso de cámara de forma más confiable.
-            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+            // CAMBIO 2: Se habilita la UI de permisos para ser más explícito, como se solicitó.
+            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true');
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
 
@@ -513,6 +515,13 @@
                 sceneEl.appendChild(targetEl);
             });
 
+            // CAMBIO 3: Añadimos un listener que espera a que la escena esté completamente cargada.
+            // Una vez cargada, iniciamos manualmente el sistema MindAR, lo que activará la cámara y los permisos.
+            sceneEl.addEventListener('loaded', () => {
+                // `start()` es la función que activa la cámara.
+                sceneEl.systems['mindar-image'].start();
+            });
+
             sceneEl.addEventListener('arReady', () => document.getElementById('scanning-ui').classList.remove('hidden'));
             sceneEl.addEventListener('targetFound', () => document.getElementById('scanning-ui').classList.add('hidden'));
             sceneEl.addEventListener('targetLost', () => document.getElementById('scanning-ui').classList.remove('hidden'));
@@ -522,6 +531,7 @@
             document.getElementById('ar-active-controls').classList.remove('hidden');
             state.isArActive = true;
         }
+
 
         function stopAR() {
             const arSceneContainer = document.getElementById('ar-scene-container');
@@ -534,7 +544,7 @@
             }
             
             arSceneContainer.innerHTML = '';
-            arSceneContainer.classList.remove('ar-active'); // CORRECCIÓN: Limpiar la clase
+            arSceneContainer.classList.remove('ar-active');
             document.getElementById('ar-preload-container').innerHTML = '';
             state.areAssetsPreloaded = false;
 
@@ -662,7 +672,6 @@
     </script>
 </body>
 </html>
-
 
 
 
