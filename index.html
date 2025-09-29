@@ -23,6 +23,10 @@
     </script>
     
     <style>
+        body.ar-active { overflow: hidden; }
+        .app-container.ar-fullscreen {
+            max-height: none; padding: 0; margin: 0; border-radius: 0;
+        }
         .page { display: none; }
         .page.active { display: block; }
         #editor-canvas { width: 100%; height: 400px; border: 1px solid #ccc; background: #f0f0f0; cursor: move; touch-action: none; }
@@ -45,15 +49,36 @@
             height: 40px;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        #fullscreen-loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 10000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
+        #scanning-ui {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 9991;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: none; /* Allows touch events to pass through */
+        }
+        .scan-box {
+            width: 70vw; height: 70vw; max-width: 400px; max-height: 400px;
+            border: 4px dashed rgba(255,255,255,0.7);
+            border-radius: 20px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.05); opacity: 1; } }
     </style>
 </head>
 <body class="bg-gray-200 text-gray-800 font-sans">
+    
+    <div id="fullscreen-loader" class="hidden">
+        <div class="loader"></div>
+        <p id="fullscreen-loader-text" class="text-white text-lg mt-4">Cargando recursos...</p>
+    </div>
 
-    <div id="app" class="container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
+    <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
         <!-- HEADER -->
         <div class="flex justify-center items-center mb-6">
              <img src="logofundacion.jpg" alt="Logo Fundación" class="h-20 mr-4" onerror="this.onerror=null;this.src='https://placehold.co/80x80/e2e8f0/94a3b8?text=Logo';">
@@ -159,6 +184,7 @@
                 <!-- Container for AR Scene and preloaded assets -->
                 <div id="ar-preload-container" class="hidden"></div>
                 <div id="ar-scene-container"></div>
+                 <div id="scanning-ui" class="hidden"><div class="scan-box"></div></div>
                 <div id="ar-active-controls" class="hidden p-4 bg-black bg-opacity-50">
                     <div class="flex justify-center items-center max-w-4xl mx-auto">
                         <button id="stop-ar-btn" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition duration-300">Detener Cámara</button>
@@ -237,6 +263,23 @@
             onTouchEnd: function() { this.isDragging = false; }
         });
 
+        AFRAME.registerComponent('model-loader', {
+            init: function () {
+                const model = this.el;
+                const target = this.el.parentElement;
+                const loader = document.createElement('a-plane');
+                loader.setAttribute('position', '0 0.5 0');
+                loader.setAttribute('scale', '0.4 0.4 0.4');
+                loader.setAttribute('material', 'src: https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.1.0/assets/loading.png; transparent: true; alphaTest: 0.5;');
+                loader.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 2000; easing: linear;');
+                target.appendChild(loader);
+                
+                model.addEventListener('model-loaded', () => {
+                    target.removeChild(loader);
+                });
+            }
+        });
+
         // --- APP FUNCTIONS ---
         async function fetchWithCache(url) {
             try {
@@ -270,7 +313,16 @@
             const loadingStatusDiv = document.getElementById('loading-status');
             const loadingText = document.getElementById('loading-text');
             const progressBar = document.getElementById('loading-progress-bar');
-            loadingStatusDiv.classList.remove('hidden');
+            const fullscreenLoader = document.getElementById('fullscreen-loader');
+            const fullscreenLoaderText = document.getElementById('fullscreen-loader-text');
+
+            const hasCached = await caches.has(CACHE_NAME);
+            if (!hasCached) {
+                fullscreenLoader.classList.remove('hidden');
+            } else {
+                 loadingStatusDiv.classList.remove('hidden');
+            }
+
             document.getElementById('load-from-github-btn').disabled = true;
             const totalAssets = ASSET_NAMES.length * 3;
             let loadedCount = 0;
@@ -282,8 +334,11 @@
                 };
                 const updateProgress = (type) => {
                     loadedCount++;
-                    progressBar.style.width = `${(loadedCount / totalAssets) * 100}%`;
-                    loadingText.textContent = `Cargando ${name}.${type}...`;
+                    const progress = (loadedCount / totalAssets) * 100;
+                    progressBar.style.width = `${progress}%`;
+                    const statusText = `Cargando ${name}.${type}...`;
+                    loadingText.textContent = statusText;
+                    fullscreenLoaderText.textContent = statusText;
                 };
                 const markerBlob = await (await fetchWithCache(urls.marker)).blob(); updateProgress('mind');
                 const modelBlob = await (await fetchWithCache(urls.model)).blob(); updateProgress('glb');
@@ -305,6 +360,8 @@
             } catch (error) {
                 loadingText.textContent = 'Error al cargar los recursos. Revisa la consola.';
                 progressBar.classList.add('bg-red-600');
+            } finally {
+                fullscreenLoader.classList.add('hidden');
             }
         }
         
@@ -464,7 +521,7 @@
                 const assetItem = document.createElement('a-asset-item');
                 assetItem.id = `model-${asset.id}`;
                 assetItem.setAttribute('src', asset.modelDataUrl);
-                assetItem.setAttribute('response-type', 'arraybuffer'); // <-- THE FIX
+                assetItem.setAttribute('response-type', 'arraybuffer');
                 assetsEl.appendChild(assetItem);
             });
             const arStatusText = document.getElementById('ar-status-text');
@@ -489,6 +546,10 @@
                 alert("Los modelos 3D aún se están cargando. Espera y vuelve a intentarlo.");
                 return;
             }
+            document.body.classList.add('ar-active');
+            document.getElementById('app').classList.add('ar-fullscreen');
+            document.getElementById('scanning-ui').classList.remove('hidden');
+
             const arSceneContainer = document.getElementById('ar-scene-container');
             arSceneContainer.innerHTML = '';
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;`;
@@ -500,14 +561,13 @@
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: true');
             
             const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
-            if(preloadedAssets) {
-                sceneEl.appendChild(preloadedAssets);
-            }
+            if(preloadedAssets) sceneEl.appendChild(preloadedAssets);
 
             const cameraEl = document.createElement('a-camera');
             cameraEl.setAttribute('position', '0 0 0');
             cameraEl.setAttribute('look-controls', 'enabled: false');
             sceneEl.appendChild(cameraEl);
+
             state.assets.forEach((asset, index) => {
                 const targetEl = document.createElement('a-entity');
                 targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
@@ -519,9 +579,21 @@
                 modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
                 modelEntity.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
                 modelEntity.setAttribute('touch-rotator', '');
+                modelEntity.setAttribute('model-loader', '');
                 targetEl.appendChild(modelEntity);
                 sceneEl.appendChild(targetEl);
             });
+
+            sceneEl.addEventListener('arReady', () => {
+                 document.getElementById('scanning-ui').classList.remove('hidden');
+            });
+             sceneEl.addEventListener('targetFound', () => {
+                document.getElementById('scanning-ui').classList.add('hidden');
+            });
+            sceneEl.addEventListener('targetLost', () => {
+                 document.getElementById('scanning-ui').classList.remove('hidden');
+            });
+
             arSceneContainer.appendChild(sceneEl);
             arSceneContainer.classList.add('ar-active');
             document.getElementById('ar-ui-container').classList.add('hidden');
@@ -530,6 +602,10 @@
         }
 
         function stopAR() {
+            document.body.classList.remove('ar-active');
+            document.getElementById('app').classList.remove('ar-fullscreen');
+            document.getElementById('scanning-ui').classList.add('hidden');
+
             const arSceneContainer = document.getElementById('ar-scene-container');
             const sceneEl = arSceneContainer.querySelector('a-scene');
             if (sceneEl && sceneEl.hasLoaded && sceneEl.systems['mindar-image']) {
@@ -587,6 +663,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
