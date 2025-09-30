@@ -239,6 +239,12 @@
         </div>
     </div>
     
+    <!-- AÑADIDO: Preloader para el inicio de la cámara -->
+    <div id="ar-preloader" class="hidden fixed inset-0 bg-black bg-opacity-75 flex flex-col justify-center items-center z-[10000]">
+        <div class="loader"></div>
+        <p class="text-white text-lg mt-4">Iniciando cámara...</p>
+    </div>
+
     <script type="module">
     // Importaciones de Three.js
     import * as THREE from 'three';
@@ -564,6 +570,10 @@
                 document.getElementById('ar-status-text').textContent = 'Error: Modelos 3D no listos.';
                 return;
             }
+            
+            // AÑADIDO: Mostrar el preloader de la cámara
+            const arPreloader = document.getElementById('ar-preloader');
+            arPreloader.classList.remove('hidden');
 
             const arSceneContainer = document.getElementById('ar-scene-container');
             arSceneContainer.innerHTML = '';
@@ -620,15 +630,20 @@
             }
 
             const scanningUI = document.getElementById('scanning-ui');
-            sceneEl.addEventListener('arReady', () => scanningUI.classList.remove('hidden'));
+            sceneEl.addEventListener('arReady', () => {
+                scanningUI.classList.remove('hidden');
+                arPreloader.classList.add('hidden'); // Ocultar preloader cuando la cámara está lista
+            });
             sceneEl.addEventListener('targetFound', () => scanningUI.classList.add('hidden'));
             sceneEl.addEventListener('targetLost', () => scanningUI.classList.remove('hidden'));
             
             arSceneContainer.appendChild(sceneEl);
 
+            const appContainer = document.getElementById('app');
             document.documentElement.classList.add('ar-active');
             document.body.classList.add('ar-active');
-            document.getElementById('app').classList.add('ar-fullscreen');
+            appContainer.classList.add('ar-fullscreen');
+            appContainer.style.maxHeight = ''; // CORREGIDO: Limpiar el estilo en línea para permitir pantalla completa
             arSceneContainer.classList.add('ar-active');
             document.getElementById('ar-ui-container').classList.add('hidden');
             document.getElementById('ar-active-controls').classList.remove('hidden');
@@ -655,9 +670,11 @@
             document.getElementById('ar-preload-container').innerHTML = '';
             state.areAssetsPreloaded = false; // Forzar precarga la próxima vez
 
+            const appContainer = document.getElementById('app');
             document.documentElement.classList.remove('ar-active');
             document.body.classList.remove('ar-active');
-            document.getElementById('app').classList.remove('ar-fullscreen');
+            appContainer.classList.remove('ar-fullscreen');
+            appContainer.style.maxHeight = '85vh'; // CORREGIDO: Restaurar el estilo en línea
             document.getElementById('ar-ui-container').classList.remove('hidden');
             document.getElementById('ar-active-controls').classList.add('hidden');
             document.getElementById('scanning-ui').classList.add('hidden');
