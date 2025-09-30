@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <!-- CORREGIDO: Título de la aplicación actualizado -->
     <title>ECOPIENSA AR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
+    <!-- CORREGIDO: Versión de Three.js alineada con la de A-Frame (r152) para evitar conflictos y errores visuales. -->
     <script type="importmap">
         {
             "imports": {
@@ -27,14 +29,16 @@
             padding: 0;
         }
         #app {
+            /* Añadida una transición suave para cuando cambia a pantalla completa */
             transition: all 0.3s ease-in-out;
         }
         .app-container.ar-fullscreen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%; max-height: none; 
             padding: 0; margin: 0; border-radius: 0;
-            overflow: hidden;
+            overflow: hidden; /* Evita barras de scroll en modo AR */
         }
+        /* AÑADIDO: Asegura que la página activa ocupe toda la altura en modo AR */
         .app-container.ar-fullscreen .page.active {
             height: 100%;
         }
@@ -45,6 +49,7 @@
         #ar-scene-container.ar-active {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9990;
         }
+        /* CORREGIDO: Se posiciona la escena de forma absoluta para garantizar que ocupe todo el contenedor. */
         #ar-scene-container.ar-active a-scene {
             position: absolute;
             top: 0;
@@ -52,18 +57,17 @@
             width: 100%;
             height: 100%;
         }
-        /* CORREGIDO: Reglas más robustas para que el video y el canvas cubran toda la pantalla */
-        #ar-scene-container.ar-active video, 
-        #ar-scene-container.ar-active .a-canvas {
-            position: absolute !important;
+        /* CORREGIDO: Reglas robustas para que el video/canvas de la cámara cubra toda la pantalla */
+        #ar-scene-container.ar-active video, #ar-scene-container.ar-active canvas {
+            object-fit: cover;
+            position: absolute;
             top: 0;
             left: 0;
-            width: 100vw !important;
-            height: 100vh !important;
-            object-fit: cover;
+            width: 100vw !important; /* Usa el ancho de la ventana gráfica */
+            height: 100vh !important; /* Usa el alto de la ventana gráfica */
             cursor: grab;
         }
-        #ar-scene-container.ar-active .a-canvas:active {
+        #ar-scene-container.ar-active canvas:active {
             cursor: grabbing;
         }
         #ar-active-controls {
@@ -83,6 +87,7 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
+        /* Estilos para la UI de escaneo */
         #scanning-ui {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 9991;
@@ -94,7 +99,9 @@
         #scanning-ui.hidden {
             display: none;
         }
-        .scan-box { display: none; }
+        .scan-box {
+            display: none;
+        }
         .scan-text {
             margin-top: 24px;
             padding: 8px 16px;
@@ -110,9 +117,9 @@
 <body class="bg-gray-200 text-gray-800 font-sans">
     
     <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
-        <!-- CORREGIDO: Se usa el logo correcto desde GitHub y se actualiza el texto alternativo -->
+        <!-- CORREGIDO: Se actualizó el logo, título y subtítulo para mayor consistencia visual -->
         <div class="flex justify-center items-center mb-6">
-             <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-20 w-auto mr-4" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
+             <img src="image_b320a3.jpg" alt="Logo ECOPIENSA" class="h-20 w-auto mr-4" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
              <div>
                  <h1 class="text-4xl font-bold text-center" style="color: #166534;">ECOPIENSA</h1>
                  <p class="text-center text-gray-500">Aprendizaje sobre reciclaje con Realidad Aumentada.</p>
@@ -161,7 +168,7 @@
                  </ul>
              </div>
             <div class="flex flex-col md:flex-row gap-6">
-                <div class="md-w-1/3">
+                <div class="md:w-1/3">
                     <label for="asset-selector" class="block mb-2 font-medium text-gray-700">Seleccionar Recurso:</label>
                     <select id="asset-selector" class="w-full p-2 border rounded mb-4"></select>
                     
@@ -302,30 +309,23 @@
 
                 const endDrag = () => { this.isDragging = false; };
 
+                // Eventos Táctiles
                 canvas.addEventListener('touchstart', (e) => { if (e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY); });
                 canvas.addEventListener('touchmove', (e) => { if (e.touches.length === 1) drag(e.touches[0].clientX, e.touches[0].clientY); });
                 canvas.addEventListener('touchend', endDrag);
+
+                // Eventos de Mouse
                 canvas.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
                 canvas.addEventListener('mousemove', (e) => drag(e.clientX, e.clientY));
                 canvas.addEventListener('mouseup', endDrag);
                 canvas.addEventListener('mouseleave', endDrag);
+
                 this.el.parentEl.addEventListener('targetFound', () => { this.isVisible = true; });
                 this.el.parentEl.addEventListener('targetLost', () => { this.isVisible = false; });
             },
         });
 
-        // AÑADIDO: Componente para forzar el redimensionamiento de la escena y el canvas
-        AFRAME.registerComponent('ar-scenemanager', {
-          init: function () {
-            this.el.sceneEl.addEventListener('arReady', () => {
-              // A-Frame a veces necesita un reajuste manual para que el canvas llene la pantalla
-              setTimeout(() => {
-                 this.el.sceneEl.resize();
-              }, 100);
-            });
-          }
-        });
-
+        // Función para obtener recursos de la red o de la caché
         async function fetchWithCache(url) {
             const cache = await caches.open(CACHE_NAME);
             const cachedResponse = await cache.match(url);
@@ -335,6 +335,7 @@
             return networkResponse;
         }
         
+        // Muestra las imágenes de los marcadores cargados
         function displayLoadedImages(assets) {
             const container = document.getElementById('image-preview-container');
             container.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-center">Imágenes de Marcadores Cargadas</h3>`;
@@ -349,6 +350,7 @@
             container.appendChild(grid);
         }
 
+        // Carga todos los recursos (marcadores, modelos, imágenes) desde GitHub
         async function loadAssetsFromGitHub() {
             const loadingStatusDiv = document.getElementById('loading-status');
             const loadingText = document.getElementById('loading-text');
@@ -416,6 +418,7 @@
             }
         }
         
+        // Inicializa la escena del editor 3D con Three.js
         function initEditor() {
             const canvas = document.getElementById('editor-canvas');
             const container = document.getElementById('editor-container');
@@ -442,6 +445,7 @@
             animate();
         }
 
+        // Rellena el selector de modelos en el editor
         function populateEditorSelector() {
             const assetSelector = document.getElementById('asset-selector');
             assetSelector.innerHTML = '';
@@ -453,6 +457,7 @@
             });
         }
 
+        // Actualiza los campos de texto con la posición, rotación y escala del modelo
         function updateTransformInputs(transform) {
             document.getElementById('pos-x').value = transform.position.x.toFixed(2);
             document.getElementById('pos-y').value = transform.position.y.toFixed(2);
@@ -463,6 +468,7 @@
             document.getElementById('scale').value = transform.scale.x.toFixed(2);
         }
 
+        // Muestra el modelo 3D seleccionado en el canvas del editor
         function displayAssetInEditor(assetId) {
             const asset = state.assets.find(a => a.id === assetId);
             if (!asset || !editor.scene) return;
@@ -508,6 +514,7 @@
             });
         }
                 
+        // Aplica las transformaciones (posición, rotación, escala) al modelo en el editor
         function updateModelTransformFromState(transform) {
             if (!editor.currentTarget) return;
             const asset = state.assets.find(a => a.id === parseInt(document.getElementById('asset-selector').value));
@@ -523,6 +530,7 @@
             editor.currentTarget.scale.set(finalScale, finalScale, finalScale);
         }
         
+        // Precarga los modelos 3D para la escena AR
         function preloadARAssets() {
             if (state.areAssetsPreloaded || state.assets.length === 0) return;
             
@@ -567,6 +575,7 @@
             arPreloadContainer.appendChild(tempScene);
         }
         
+        // Función centralizada para iniciar la cámara y la sesión AR
         function setupAndStartAR(useAutoStart) {
             if (!state.areAssetsPreloaded) {
                 document.getElementById('ar-status-text').textContent = 'Error: Modelos 3D no listos.';
@@ -577,10 +586,9 @@
             arSceneContainer.innerHTML = '';
             
             const sceneEl = document.createElement('a-scene');
+            // AÑADIDO: Atributo 'embedded' para evitar que A-Frame controle el modo de pantalla completa por su cuenta.
             sceneEl.setAttribute('embedded', '');
             
-            // NOTA DE RENDIMIENTO: 'maxTrackables: 1' es la optimización clave para celulares, 
-            // ya que reduce la carga de procesamiento al enfocar el seguimiento en un solo marcador a la vez.
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; maxTrackables: 1; autoStart: ${useAutoStart}; uiLoading: no; uiError: no; uiScanning: no;`;
             
             sceneEl.setAttribute('mindar-image', mindARSettings);
@@ -588,8 +596,6 @@
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
-            // AÑADIDO: Se adjunta el componente para gestionar el tamaño de la escena
-            sceneEl.setAttribute('ar-scenemanager', '');
 
             const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
             if(preloadedAssets) {
@@ -653,6 +659,7 @@
             }
         }
 
+        // Detiene la sesión AR y limpia los recursos de forma robusta
         function stopAR() {
             const arSceneContainer = document.getElementById('ar-scene-container');
             const sceneEl = arSceneContainer.querySelector('a-scene');
@@ -665,7 +672,7 @@
             
             arSceneContainer.innerHTML = '';
             document.getElementById('ar-preload-container').innerHTML = '';
-            state.areAssetsPreloaded = false;
+            state.areAssetsPreloaded = false; // Forzar precarga la próxima vez
 
             document.documentElement.classList.remove('ar-active');
             document.body.classList.remove('ar-active');
@@ -681,6 +688,7 @@
             state.isArActive = false;
         }
         
+        // Activa/desactiva el modo de pantalla completa
         function toggleFullScreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
@@ -691,6 +699,7 @@
             }
         }
 
+        // Navega entre las diferentes páginas de la aplicación
         function navigateTo(pageId) {
             if (state.isArActive) {
                 stopAR();
@@ -715,6 +724,7 @@
             }
         }
 
+        // Intenta cargar los recursos desde la caché al iniciar la aplicación
         async function loadAssetsFromCacheOnStartup() {
             try {
                 const cache = await caches.open(CACHE_NAME);
@@ -751,6 +761,7 @@
             }
         }
         
+        // Función principal que inicializa la aplicación
         async function initializeApp() {
             const successfullyLoadedFromCache = await loadAssetsFromCacheOnStartup();
 
@@ -772,13 +783,16 @@
         document.getElementById('goto-ar-btn').addEventListener('click', () => navigateTo('page-ar'));
         document.getElementById('back-to-upload-btn').addEventListener('click', () => navigateTo('page-upload'));
         document.getElementById('back-to-editor-btn-pre').addEventListener('click', () => navigateTo('page-editor'));
+        
         document.getElementById('start-ar-pc-btn').addEventListener('click', () => setupAndStartAR(false));
         document.getElementById('start-ar-mobile-btn').addEventListener('click', () => setupAndStartAR(true));
+        
         document.getElementById('stop-ar-btn').addEventListener('click', stopAR);
         document.getElementById('fullscreen-ar-btn').addEventListener('click', toggleFullScreen);
         document.getElementById('back-to-editor-btn-post').addEventListener('click', () => { navigateTo('page-editor'); });
         document.getElementById('asset-selector').addEventListener('change', (e) => displayAssetInEditor(parseInt(e.target.value)));
         
+        // Listeners para los inputs de transformación
         ['pos-x', 'pos-y', 'pos-z', 'rot-x', 'rot-y', 'rot-z', 'scale'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
                 const assetId = parseInt(document.getElementById('asset-selector').value);
@@ -794,13 +808,12 @@
             });
         });
         
+        // Iniciar la aplicación
         initializeApp();
     });
     </script>
 </body>
 </html>
-
-
 
 
 
