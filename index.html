@@ -34,7 +34,7 @@
         .app-container.ar-fullscreen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%; max-height: none; 
-            padding: 0; margin: 0; border-radius: 0;
+            padding: 0; margin: 0 !important; border-radius: 0;
             overflow: hidden;
         }
         /* AÑADIDO: Asegura que la página activa ocupe toda la altura en modo AR */
@@ -633,6 +633,14 @@
             sceneEl.addEventListener('arReady', () => {
                 scanningUI.classList.remove('hidden');
                 arPreloader.classList.add('hidden'); // Ocultar preloader cuando la cámara está lista
+                
+                // AÑADIDO: Forzar el reajuste del renderer de A-Frame.
+                // Esto soluciona el problema de desplazamiento en móviles después de que la cámara se inicia.
+                setTimeout(() => {
+                    if (sceneEl.renderer) {
+                        sceneEl.renderer.setSize(window.innerWidth, window.innerHeight);
+                    }
+                }, 100); // Un pequeño retraso para asegurar que todo esté en el DOM
             });
             sceneEl.addEventListener('targetFound', () => scanningUI.classList.add('hidden'));
             sceneEl.addEventListener('targetLost', () => scanningUI.classList.remove('hidden'));
@@ -806,6 +814,7 @@
     </script>
 </body>
 </html>
+
 
 
 
