@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>EcoBookMagik</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn/tailwindcss.com"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
@@ -19,7 +19,14 @@
     
     <style>
         /* Estilos generales y para el modo AR */
-        body.ar-active { overflow: hidden; }
+        /* CORREGIDO: Asegura que el body ocupe toda la pantalla en modo AR */
+        body.ar-active { 
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
         .app-container.ar-fullscreen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%; max-height: none; 
@@ -36,7 +43,7 @@
             width: 100%;
             height: 100%;
         }
-        /* CORREGIDO: Asegura que el video de la cámara cubra toda la pantalla y cursor de mano */
+        /* Asegura que el video de la cámara cubra toda la pantalla y cursor de mano */
         #ar-scene-container.ar-active video, #ar-scene-container.ar-active canvas {
             object-fit: cover;
             width: 100% !important;
@@ -101,7 +108,6 @@
         <div class="flex justify-center items-center mb-6">
              <img src="asetss/logofundacion.jpg" alt="Logo Fundación" class="h-20 mr-4" onerror="this.onerror=null;this.src='https://placehold.co/80x80/e2e8f0/94a3b8?text=Logo';">
             <div>
-                <!-- CORREGIDO: Título y subtítulo actualizados -->
                 <h1 class="text-3xl font-bold text-center" style="color: #166534;">EcoBookMagik</h1>
                 <p class="text-center text-gray-500">La experiencia de aprender reciclaje en realidad aumentada.</p>
             </div>
@@ -568,7 +574,9 @@
             
             const sceneEl = document.createElement('a-scene');
             
-            // CORREGIDO: Optimización para enfocar en un solo marcador a la vez.
+            // NOTA DE RENDIMIENTO: 'maxTrackables: 1' es la optimización clave para celulares, 
+            // ya que reduce la carga de procesamiento al enfocar el seguimiento en un solo marcador a la vez.
+            // El rendimiento final aún dependerá de la potencia del dispositivo.
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; maxTrackables: 1; autoStart: ${useAutoStart}; uiLoading: no; uiError: no; uiScanning: no;`;
             
             sceneEl.setAttribute('mindar-image', mindARSettings);
@@ -792,6 +800,7 @@
     </script>
 </body>
 </html>
+
 
 
 
