@@ -585,16 +585,19 @@
                 sceneEl.appendChild(targetEl);
             });
 
-            // CORREGIDO: Si no usamos autoStart (PC), iniciamos la cámara manualmente usando el nombre de sistema correcto.
+            // CORREGIDO: Lógica robusta para iniciar la cámara en PC para evitar la pantalla blanca.
             if (!useAutoStart) {
                 sceneEl.addEventListener('loaded', () => {
-                    const mindarSystem = sceneEl.systems['mindar-image-system'];
-                    if(mindarSystem) {
-                        mindarSystem.start();
-                    } else {
-                        console.error("Error crítico: No se pudo encontrar el sistema de MindAR para iniciar.");
-                        document.getElementById('ar-status-text').textContent = 'Error: no se pudo iniciar MindAR.';
-                    }
+                    const startMindAR = () => {
+                        const mindarSystem = sceneEl.systems['mindar-image-system'];
+                        if (mindarSystem) {
+                            mindarSystem.start();
+                        } else {
+                            // Si el sistema no está listo, espera un poco y vuelve a intentarlo.
+                            setTimeout(startMindAR, 100); 
+                        }
+                    };
+                    startMindAR();
                 });
             }
 
@@ -611,6 +614,13 @@
             document.getElementById('ar-ui-container').classList.add('hidden');
             document.getElementById('ar-active-controls').classList.remove('hidden');
             state.isArActive = true;
+            
+            // CORREGIDO: Entrar en pantalla completa automáticamente en el celular para una experiencia inmersiva.
+            if (useAutoStart) { // true for mobile
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.warn("No se pudo entrar en pantalla completa automáticamente.", err);
+                });
+            }
         }
 
         // Detiene la sesión AR y limpia los recursos de forma robusta
@@ -633,6 +643,12 @@
             document.getElementById('ar-ui-container').classList.remove('hidden');
             document.getElementById('ar-active-controls').classList.add('hidden');
             document.getElementById('scanning-ui').classList.add('hidden');
+            
+            // CORREGIDO: Salir de pantalla completa al detener la AR.
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(err => console.error("Error al salir de pantalla completa:", err));
+            }
+
             state.isArActive = false;
         }
         
@@ -763,8 +779,6 @@
     </script>
 </body>
 </html>
-
-
 
 
 
