@@ -9,7 +9,7 @@
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-    <!-- CORREGIDO: Versión de Three.js alineada con la de A-Frame (r152) para evitar conflictos y errores visuales. -->
+    <!-- CORREGIDO: Versión de Three.js alineada con la de A-Frame para evitar conflictos. -->
     <script type="importmap">
         {
             "imports": {
@@ -29,14 +29,13 @@
             padding: 0;
         }
         #app {
-            /* Añadida una transición suave para cuando cambia a pantalla completa */
             transition: all 0.3s ease-in-out;
         }
         .app-container.ar-fullscreen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%; max-height: none; 
             padding: 0; margin: 0; border-radius: 0;
-            overflow: hidden; /* Evita barras de scroll en modo AR */
+            overflow: hidden;
         }
         /* AÑADIDO: Asegura que la página activa ocupe toda la altura en modo AR */
         .app-container.ar-fullscreen .page.active {
@@ -87,7 +86,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Estilos para la UI de escaneo */
         #scanning-ui {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 9991;
@@ -99,9 +97,6 @@
         #scanning-ui.hidden {
             display: none;
         }
-        .scan-box {
-            display: none;
-        }
         .scan-text {
             margin-top: 24px;
             padding: 8px 16px;
@@ -111,7 +106,6 @@
             border-radius: 8px;
             text-shadow: 1px 1px 2px black;
         }
-        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.05); opacity: 1; } }
     </style>
 </head>
 <body class="bg-gray-200 text-gray-800 font-sans">
@@ -119,7 +113,7 @@
     <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
         <!-- CORREGIDO: Se actualizó el logo, título y subtítulo para mayor consistencia visual -->
         <div class="flex justify-center items-center mb-6">
-             <img src="image_b320a3.jpg" alt="Logo ECOPIENSA" class="h-20 w-auto mr-4" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
+             <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo ECOPIENSA" class="h-20 w-auto mr-4" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
              <div>
                  <h1 class="text-4xl font-bold text-center" style="color: #166534;">ECOPIENSA</h1>
                  <p class="text-center text-gray-500">Aprendizaje sobre reciclaje con Realidad Aumentada.</p>
@@ -228,7 +222,6 @@
                  <div id="ar-preload-container" class="hidden"></div>
                  <div id="ar-scene-container"></div>
                  <div id="scanning-ui" class="hidden">
-                    <div class="scan-box"></div>
                     <p class="scan-text">Apunte al marcador</p>
                  </div>
                  <div id="ar-active-controls" class="hidden p-4 bg-black bg-opacity-50">
@@ -279,7 +272,7 @@
             'papelitoverde', 'senorcontenedor', 'taparoja'
         ];
 
-        // Componente de A-Frame para rotación con TACTIL y MOUSE en 2 ejes (X y Y)
+        // Componente de A-Frame para rotación con TACTIL y MOUSE
         AFRAME.registerComponent('ar-rotator', {
             schema: { rotationFactor: { type: 'number', default: 1 } },
             init: function () {
@@ -325,7 +318,6 @@
             },
         });
 
-        // Función para obtener recursos de la red o de la caché
         async function fetchWithCache(url) {
             const cache = await caches.open(CACHE_NAME);
             const cachedResponse = await cache.match(url);
@@ -335,7 +327,6 @@
             return networkResponse;
         }
         
-        // Muestra las imágenes de los marcadores cargados
         function displayLoadedImages(assets) {
             const container = document.getElementById('image-preview-container');
             container.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-center">Imágenes de Marcadores Cargadas</h3>`;
@@ -350,7 +341,6 @@
             container.appendChild(grid);
         }
 
-        // Carga todos los recursos (marcadores, modelos, imágenes) desde GitHub
         async function loadAssetsFromGitHub() {
             const loadingStatusDiv = document.getElementById('loading-status');
             const loadingText = document.getElementById('loading-text');
@@ -418,7 +408,6 @@
             }
         }
         
-        // Inicializa la escena del editor 3D con Three.js
         function initEditor() {
             const canvas = document.getElementById('editor-canvas');
             const container = document.getElementById('editor-container');
@@ -445,7 +434,6 @@
             animate();
         }
 
-        // Rellena el selector de modelos en el editor
         function populateEditorSelector() {
             const assetSelector = document.getElementById('asset-selector');
             assetSelector.innerHTML = '';
@@ -457,7 +445,6 @@
             });
         }
 
-        // Actualiza los campos de texto con la posición, rotación y escala del modelo
         function updateTransformInputs(transform) {
             document.getElementById('pos-x').value = transform.position.x.toFixed(2);
             document.getElementById('pos-y').value = transform.position.y.toFixed(2);
@@ -468,7 +455,6 @@
             document.getElementById('scale').value = transform.scale.x.toFixed(2);
         }
 
-        // Muestra el modelo 3D seleccionado en el canvas del editor
         function displayAssetInEditor(assetId) {
             const asset = state.assets.find(a => a.id === assetId);
             if (!asset || !editor.scene) return;
@@ -514,7 +500,6 @@
             });
         }
                 
-        // Aplica las transformaciones (posición, rotación, escala) al modelo en el editor
         function updateModelTransformFromState(transform) {
             if (!editor.currentTarget) return;
             const asset = state.assets.find(a => a.id === parseInt(document.getElementById('asset-selector').value));
@@ -530,7 +515,6 @@
             editor.currentTarget.scale.set(finalScale, finalScale, finalScale);
         }
         
-        // Precarga los modelos 3D para la escena AR
         function preloadARAssets() {
             if (state.areAssetsPreloaded || state.assets.length === 0) return;
             
@@ -575,7 +559,6 @@
             arPreloadContainer.appendChild(tempScene);
         }
         
-        // Función centralizada para iniciar la cámara y la sesión AR
         function setupAndStartAR(useAutoStart) {
             if (!state.areAssetsPreloaded) {
                 document.getElementById('ar-status-text').textContent = 'Error: Modelos 3D no listos.';
@@ -586,7 +569,6 @@
             arSceneContainer.innerHTML = '';
             
             const sceneEl = document.createElement('a-scene');
-            // AÑADIDO: Atributo 'embedded' para evitar que A-Frame controle el modo de pantalla completa por su cuenta.
             sceneEl.setAttribute('embedded', '');
             
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; maxTrackables: 1; autoStart: ${useAutoStart}; uiLoading: no; uiError: no; uiScanning: no;`;
@@ -652,14 +634,13 @@
             document.getElementById('ar-active-controls').classList.remove('hidden');
             state.isArActive = true;
             
-            if (useAutoStart) { // true for mobile
+            if (useAutoStart) { 
                 document.documentElement.requestFullscreen().catch(err => {
                     console.warn("No se pudo entrar en pantalla completa automáticamente.", err);
                 });
             }
         }
 
-        // Detiene la sesión AR y limpia los recursos de forma robusta
         function stopAR() {
             const arSceneContainer = document.getElementById('ar-scene-container');
             const sceneEl = arSceneContainer.querySelector('a-scene');
@@ -688,7 +669,6 @@
             state.isArActive = false;
         }
         
-        // Activa/desactiva el modo de pantalla completa
         function toggleFullScreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
@@ -699,7 +679,6 @@
             }
         }
 
-        // Navega entre las diferentes páginas de la aplicación
         function navigateTo(pageId) {
             if (state.isArActive) {
                 stopAR();
@@ -724,7 +703,6 @@
             }
         }
 
-        // Intenta cargar los recursos desde la caché al iniciar la aplicación
         async function loadAssetsFromCacheOnStartup() {
             try {
                 const cache = await caches.open(CACHE_NAME);
@@ -761,7 +739,6 @@
             }
         }
         
-        // Función principal que inicializa la aplicación
         async function initializeApp() {
             const successfullyLoadedFromCache = await loadAssetsFromCacheOnStartup();
 
@@ -792,7 +769,6 @@
         document.getElementById('back-to-editor-btn-post').addEventListener('click', () => { navigateTo('page-editor'); });
         document.getElementById('asset-selector').addEventListener('change', (e) => displayAssetInEditor(parseInt(e.target.value)));
         
-        // Listeners para los inputs de transformación
         ['pos-x', 'pos-y', 'pos-z', 'rot-x', 'rot-y', 'rot-z', 'scale'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
                 const assetId = parseInt(document.getElementById('asset-selector').value);
@@ -808,7 +784,6 @@
             });
         });
         
-        // Iniciar la aplicación
         initializeApp();
     });
     </script>
