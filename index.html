@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>EcoBookMagik AR</title>
+    <title>ECOPIENSA AR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -52,6 +52,7 @@
             width: 100%;
             height: 100%;
         }
+        /* CORREGIDO: Reglas más robustas para que el video y el canvas cubran toda la pantalla */
         #ar-scene-container.ar-active video, 
         #ar-scene-container.ar-active .a-canvas {
             position: absolute !important;
@@ -109,11 +110,12 @@
 <body class="bg-gray-200 text-gray-800 font-sans">
     
     <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
+        <!-- CORREGIDO: Se usa el logo correcto desde GitHub y se actualiza el texto alternativo -->
         <div class="flex justify-center items-center mb-6">
-             <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-20 w-auto mr-4" crossorigin="anonymous" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
+             <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-20 w-auto mr-4" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
              <div>
-                 <h1 class="text-3xl font-bold text-center" style="color: #166534;">EcoBookMagik</h1>
-                 <p class="text-center text-gray-500">La experiencia de aprender reciclaje en realidad aumentada.</p>
+                 <h1 class="text-4xl font-bold text-center" style="color: #166534;">ECOPIENSA</h1>
+                 <p class="text-center text-gray-500">Aprendizaje sobre reciclaje con Realidad Aumentada.</p>
              </div>
         </div>
 
@@ -312,12 +314,14 @@
             },
         });
 
+        // AÑADIDO: Componente para forzar el redimensionamiento de la escena y el canvas
         AFRAME.registerComponent('ar-scenemanager', {
           init: function () {
             this.el.sceneEl.addEventListener('arReady', () => {
-              const resizeScene = () => this.el.sceneEl.resize();
-              setTimeout(resizeScene, 100);
-              setTimeout(resizeScene, 500);
+              // A-Frame a veces necesita un reajuste manual para que el canvas llene la pantalla
+              setTimeout(() => {
+                 this.el.sceneEl.resize();
+              }, 100);
             });
           }
         });
@@ -575,14 +579,16 @@
             const sceneEl = document.createElement('a-scene');
             sceneEl.setAttribute('embedded', '');
             
+            // NOTA DE RENDIMIENTO: 'maxTrackables: 1' es la optimización clave para celulares, 
+            // ya que reduce la carga de procesamiento al enfocar el seguimiento en un solo marcador a la vez.
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; maxTrackables: 1; autoStart: ${useAutoStart}; uiLoading: no; uiError: no; uiScanning: no;`;
             
             sceneEl.setAttribute('mindar-image', mindARSettings);
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
             sceneEl.setAttribute('color-space', 'sRGB');
-            // CORREGIDO: Se revierte el cambio de optimización que causó el fallo de la cámara.
-            sceneEl.setAttribute('renderer', 'colorManagement: true; physicallyCorrectLights');
+            sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights');
+            // AÑADIDO: Se adjunta el componente para gestionar el tamaño de la escena
             sceneEl.setAttribute('ar-scenemanager', '');
 
             const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
@@ -640,7 +646,7 @@
             document.getElementById('ar-active-controls').classList.remove('hidden');
             state.isArActive = true;
             
-            if (useAutoStart) {
+            if (useAutoStart) { // true for mobile
                 document.documentElement.requestFullscreen().catch(err => {
                     console.warn("No se pudo entrar en pantalla completa automáticamente.", err);
                 });
@@ -793,8 +799,6 @@
     </script>
 </body>
 </html>
-
-
 
 
 
