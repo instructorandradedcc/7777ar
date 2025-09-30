@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>EcoBookMagik</title>
-    <!-- CORREGIDO: URL de Tailwind CSS reparada -->
+    <!-- CORREGIDO: Título de la aplicación actualizado -->
+    <title>ECOPIENSA AR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
+    <!-- CORREGIDO: Versión de Three.js alineada con la de A-Frame (r152) para evitar conflictos y errores visuales. -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+                "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
             }
         }
     </script>
     
     <style>
         /* Estilos generales y para el modo AR */
-        /* CORREGIDO: Asegura que html y body ocupen toda la pantalla en modo AR */
         html.ar-active, body.ar-active { 
             overflow: hidden;
             width: 100%;
@@ -28,30 +28,43 @@
             margin: 0;
             padding: 0;
         }
+        #app {
+            /* Añadida una transición suave para cuando cambia a pantalla completa */
+            transition: all 0.3s ease-in-out;
+        }
         .app-container.ar-fullscreen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%; max-height: none; 
             padding: 0; margin: 0; border-radius: 0;
+            overflow: hidden; /* Evita barras de scroll en modo AR */
+        }
+        /* AÑADIDO: Asegura que la página activa ocupe toda la altura en modo AR */
+        .app-container.ar-fullscreen .page.active {
+            height: 100%;
         }
         .page { display: none; }
         .page.active { display: block; }
         #editor-canvas { width: 100%; height: 400px; border: 1px solid #ccc; background: #f0f0f0; cursor: move; touch-action: none; border-radius: 8px; }
+        
         #ar-scene-container.ar-active {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9990;
         }
-        /* Corrección para que la escena A-Frame ocupe toda la pantalla */
+        /* CORREGIDO: Se posiciona la escena de forma absoluta para garantizar que ocupe todo el contenedor. */
         #ar-scene-container.ar-active a-scene {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
         }
-        /* Asegura que el video de la cámara cubra toda la pantalla y cursor de mano */
+        /* CORREGIDO: Reglas robustas para que el video/canvas de la cámara cubra toda la pantalla */
         #ar-scene-container.ar-active video, #ar-scene-container.ar-active canvas {
             object-fit: cover;
             position: absolute;
             top: 0;
             left: 0;
-            width: 100vw !important; /* Usa viewport width */
-            height: 100vh !important; /* Usa viewport height */
+            width: 100vw !important; /* Usa el ancho de la ventana gráfica */
+            height: 100vh !important; /* Usa el alto de la ventana gráfica */
             cursor: grab;
         }
         #ar-scene-container.ar-active canvas:active {
@@ -104,12 +117,13 @@
 <body class="bg-gray-200 text-gray-800 font-sans">
     
     <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
+        <!-- CORREGIDO: Se actualizó el logo, título y subtítulo para mayor consistencia visual -->
         <div class="flex justify-center items-center mb-6">
-             <img src="asetss/logofundacion.jpg" alt="Logo Fundación" class="h-20 mr-4" onerror="this.onerror=null;this.src='https://placehold.co/80x80/e2e8f0/94a3b8?text=Logo';">
-            <div>
-                <h1 class="text-3xl font-bold text-center" style="color: #166534;">EcoBookMagik</h1>
-                <p class="text-center text-gray-500">La experiencia de aprender reciclaje en realidad aumentada.</p>
-            </div>
+             <img src="image_b320a3.jpg" alt="Logo ECOPIENSA" class="h-20 w-auto mr-4" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
+             <div>
+                 <h1 class="text-4xl font-bold text-center" style="color: #166534;">ECOPIENSA</h1>
+                 <p class="text-center text-gray-500">Aprendizaje sobre reciclaje con Realidad Aumentada.</p>
+             </div>
         </div>
 
         <!-- PÁGINA 1: Carga de Recursos -->
@@ -572,10 +586,9 @@
             arSceneContainer.innerHTML = '';
             
             const sceneEl = document.createElement('a-scene');
+            // AÑADIDO: Atributo 'embedded' para evitar que A-Frame controle el modo de pantalla completa por su cuenta.
+            sceneEl.setAttribute('embedded', '');
             
-            // NOTA DE RENDIMIENTO: 'maxTrackables: 1' es la optimización clave para celulares, 
-            // ya que reduce la carga de procesamiento al enfocar el seguimiento en un solo marcador a la vez.
-            // El rendimiento final aún dependerá de la potencia del dispositivo.
             const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; maxTrackables: 1; autoStart: ${useAutoStart}; uiLoading: no; uiError: no; uiScanning: no;`;
             
             sceneEl.setAttribute('mindar-image', mindARSettings);
@@ -631,7 +644,6 @@
             
             arSceneContainer.appendChild(sceneEl);
 
-            // CORREGIDO: Añade clase al HTML y al BODY
             document.documentElement.classList.add('ar-active');
             document.body.classList.add('ar-active');
             document.getElementById('app').classList.add('ar-fullscreen');
@@ -652,9 +664,9 @@
             const arSceneContainer = document.getElementById('ar-scene-container');
             const sceneEl = arSceneContainer.querySelector('a-scene');
             if (sceneEl && sceneEl.hasLoaded) {
-                 if(sceneEl.systems['mindar-image-system']) {
+                if(sceneEl.systems['mindar-image-system']) {
                      sceneEl.systems['mindar-image-system'].stop();
-                 }
+                }
                 sceneEl.parentNode.removeChild(sceneEl);
             }
             
@@ -662,7 +674,6 @@
             document.getElementById('ar-preload-container').innerHTML = '';
             state.areAssetsPreloaded = false; // Forzar precarga la próxima vez
 
-            // CORREGIDO: Remueve clase del HTML y del BODY
             document.documentElement.classList.remove('ar-active');
             document.body.classList.remove('ar-active');
             document.getElementById('app').classList.remove('ar-fullscreen');
@@ -704,7 +715,7 @@
                 if (!editor.renderer) initEditor();
                 populateEditorSelector();
                 if (state.assets.length > 0) {
-                      displayAssetInEditor(parseInt(document.getElementById('asset-selector').value) || 0);
+                     displayAssetInEditor(parseInt(document.getElementById('asset-selector').value) || 0);
                 }
             } else if (pageId === 'page-ar') {
                 document.getElementById('start-ar-pc-btn').disabled = true;
@@ -803,7 +814,6 @@
     </script>
 </body>
 </html>
-
 
 
 
