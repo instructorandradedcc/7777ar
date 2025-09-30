@@ -36,6 +36,15 @@
             width: 100%;
             height: 100%;
         }
+        /* CORREGIDO: Asegura que el video de la cámara cubra toda la pantalla */
+        #ar-scene-container.ar-active video {
+            object-fit: cover;
+            width: 100% !important;
+            height: 100% !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
         #ar-active-controls {
             position: fixed;
             bottom: 0;
@@ -66,7 +75,6 @@
             display: none;
         }
         .scan-box {
-            /* CORREGIDO: Ocultamos el cuadro punteado como se solicitó */
             display: none;
         }
         .scan-text {
@@ -144,7 +152,6 @@
                         <input type="number" id="pos-y" class="w-full p-1 border rounded" step="0.01" value="0">
                         <input type="number" id="pos-z" class="w-full p-1 border rounded" step="0.01" value="0">
                     </div>
-                    <!-- CORREGIDO: Añadido texto de ayuda para la posición Z -->
                     <p class="text-xs text-gray-500 mt-1">Ajusta 'Z' para acercar o alejar el modelo del marcador.</p>
 
                     <h3 class="font-semibold mt-4">Rotación (X, Y, Z)</h3>
@@ -173,7 +180,7 @@
                  <div id="ar-ui-container" class="relative z-10">
                      <h2 class="text-2xl font-semibold mb-4 text-center">Paso 3: Vista de Realidad Aumentada</h2>
                      <div class="bg-white p-4 rounded-lg shadow-md mb-4">
-                         <p class="text-center">Apunta tu cámara a una de las imágenes de los marcadores. <strong>Puedes girar el modelo 3D deslizando el dedo sobre la pantalla.</strong></p>
+                         <p class="text-center">Apunta tu cámara a una de las imágenes de los marcadores. <strong>Puedes girar el modelo 3D deslizando el dedo o con el mouse.</strong></p>
                          <div id="ar-status" class="text-center font-mono p-2 bg-gray-100 rounded mt-2 flex justify-center items-center gap-2">
                              <div class="loader hidden"></div>
                              <span id="ar-status-text">Estado: Esperando cámara...</span>
@@ -246,44 +253,46 @@
             'papelitoverde', 'senorcontenedor', 'taparoja'
         ];
 
-        // CORREGIDO: Componente de A-Frame para rotación táctil en 2 ejes (X y Y)
-        AFRAME.registerComponent('touch-rotator', {
+        // CORREGIDO: Componente de A-Frame para rotación con TACTIL y MOUSE en 2 ejes (X y Y)
+        AFRAME.registerComponent('ar-rotator', {
             schema: { rotationFactor: { type: 'number', default: 1 } },
             init: function () {
                 this.isVisible = false;
                 this.isDragging = false;
-                this.previousDragX = 0;
-                this.previousDragY = 0;
+                this.previousDrag = { x: 0, y: 0 };
                 const canvas = this.el.sceneEl.canvas;
-                
-                const onTouchStart = (e) => {
-                    if (e.touches.length === 1 && this.isVisible) {
+
+                const startDrag = (x, y) => {
+                    if (this.isVisible) {
                         this.isDragging = true;
-                        this.previousDragX = e.touches[0].clientX;
-                        this.previousDragY = e.touches[0].clientY;
+                        this.previousDrag = { x, y };
                     }
                 };
-                
-                const onTouchMove = (e) => {
-                    if (this.isDragging && e.touches.length === 1 && this.isVisible) {
-                        const deltaX = e.touches[0].clientX - this.previousDragX;
-                        const deltaY = e.touches[0].clientY - this.previousDragY;
+
+                const drag = (x, y) => {
+                    if (this.isDragging && this.isVisible) {
+                        const deltaX = x - this.previousDrag.x;
+                        const deltaY = y - this.previousDrag.y;
                         
-                        // Rotación horizontal (eje Y)
                         this.el.object3D.rotation.y += THREE.MathUtils.degToRad(deltaX * this.data.rotationFactor);
-                        // Rotación vertical (eje X)
                         this.el.object3D.rotation.x += THREE.MathUtils.degToRad(deltaY * this.data.rotationFactor);
 
-                        this.previousDragX = e.touches[0].clientX;
-                        this.previousDragY = e.touches[0].clientY;
+                        this.previousDrag = { x, y };
                     }
                 };
 
-                const onTouchEnd = () => { this.isDragging = false; };
-                
-                canvas.addEventListener('touchstart', onTouchStart);
-                canvas.addEventListener('touchmove', onTouchMove);
-                canvas.addEventListener('touchend', onTouchEnd);
+                const endDrag = () => { this.isDragging = false; };
+
+                // Eventos Táctiles
+                canvas.addEventListener('touchstart', (e) => { if (e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY); });
+                canvas.addEventListener('touchmove', (e) => { if (e.touches.length === 1) drag(e.touches[0].clientX, e.touches[0].clientY); });
+                canvas.addEventListener('touchend', endDrag);
+
+                // Eventos de Mouse
+                canvas.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
+                canvas.addEventListener('mousemove', (e) => drag(e.clientX, e.clientY));
+                canvas.addEventListener('mouseup', endDrag);
+                canvas.addEventListener('mouseleave', endDrag); // Terminar si el mouse sale del canvas
 
                 this.el.parentEl.addEventListener('targetFound', () => { this.isVisible = true; });
                 this.el.parentEl.addEventListener('targetLost', () => { this.isVisible = false; });
@@ -568,6 +577,8 @@
             const cameraEl = document.createElement('a-camera');
             cameraEl.setAttribute('position', '0 0 0');
             cameraEl.setAttribute('look-controls', 'enabled: false');
+            // CORREGIDO: Sincronizar el campo de visión (FOV) con el del editor.
+            cameraEl.setAttribute('fov', '75'); 
             sceneEl.appendChild(cameraEl);
 
             state.assets.forEach((asset, index) => {
@@ -580,12 +591,11 @@
                 modelEntity.setAttribute('position', `${t.position.x} ${t.position.y} ${t.position.z}`);
                 modelEntity.setAttribute('rotation', `${t.rotation.x} ${t.rotation.y} ${t.rotation.z}`);
                 modelEntity.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
-                modelEntity.setAttribute('touch-rotator', '');
+                modelEntity.setAttribute('ar-rotator', ''); // Usar el nuevo componente unificado
                 targetEl.appendChild(modelEntity);
                 sceneEl.appendChild(targetEl);
             });
 
-            // CORREGIDO: Lógica robusta para iniciar la cámara en PC para evitar la pantalla blanca.
             if (!useAutoStart) {
                 sceneEl.addEventListener('loaded', () => {
                     const startMindAR = () => {
@@ -593,7 +603,6 @@
                         if (mindarSystem) {
                             mindarSystem.start();
                         } else {
-                            // Si el sistema no está listo, espera un poco y vuelve a intentarlo.
                             setTimeout(startMindAR, 100); 
                         }
                     };
@@ -615,7 +624,6 @@
             document.getElementById('ar-active-controls').classList.remove('hidden');
             state.isArActive = true;
             
-            // CORREGIDO: Entrar en pantalla completa automáticamente en el celular para una experiencia inmersiva.
             if (useAutoStart) { // true for mobile
                 document.documentElement.requestFullscreen().catch(err => {
                     console.warn("No se pudo entrar en pantalla completa automáticamente.", err);
@@ -644,7 +652,6 @@
             document.getElementById('ar-active-controls').classList.add('hidden');
             document.getElementById('scanning-ui').classList.add('hidden');
             
-            // CORREGIDO: Salir de pantalla completa al detener la AR.
             if (document.fullscreenElement) {
                 document.exitFullscreen().catch(err => console.error("Error al salir de pantalla completa:", err));
             }
@@ -682,7 +689,6 @@
                       displayAssetInEditor(parseInt(document.getElementById('asset-selector').value) || 0);
                 }
             } else if (pageId === 'page-ar') {
-                // Habilitar botones y precargar
                 document.getElementById('start-ar-pc-btn').disabled = true;
                 document.getElementById('start-ar-mobile-btn').disabled = true;
                 preloadARAssets();
@@ -779,6 +785,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
