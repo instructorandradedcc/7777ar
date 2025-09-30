@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ECOPIENSA AR</title>
+    <title>EcoBookMagik AR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -109,7 +109,6 @@
 <body class="bg-gray-200 text-gray-800 font-sans">
     
     <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
-        <!-- CORREGIDO: Se revierte a la identidad visual original y se añade crossorigin al logo -->
         <div class="flex justify-center items-center mb-6">
              <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo Fundación" class="h-20 w-auto mr-4" crossorigin="anonymous" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
              <div>
@@ -313,12 +312,9 @@
             },
         });
 
-        // CORREGIDO: Componente mejorado para forzar el redimensionamiento de la escena y el canvas
         AFRAME.registerComponent('ar-scenemanager', {
           init: function () {
             this.el.sceneEl.addEventListener('arReady', () => {
-              // Se fuerza el redimensionamiento varias veces para asegurar que el canvas ocupe
-              // toda la pantalla, especialmente después de que los elementos de la UI del navegador se oculten.
               const resizeScene = () => this.el.sceneEl.resize();
               setTimeout(resizeScene, 100);
               setTimeout(resizeScene, 500);
@@ -585,9 +581,8 @@
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
             sceneEl.setAttribute('color-space', 'sRGB');
-            // CORREGIDO: 'antialias: false' y 'precision: medium' son optimizaciones clave para mejorar
-            // el rendimiento en dispositivos móviles, reduciendo la carga en la GPU.
-            sceneEl.setAttribute('renderer', 'antialias: false; precision: medium; colorManagement: true; physicallyCorrectLights');
+            // CORREGIDO: Se revierte el cambio de optimización que causó el fallo de la cámara.
+            sceneEl.setAttribute('renderer', 'colorManagement: true; physicallyCorrectLights');
             sceneEl.setAttribute('ar-scenemanager', '');
 
             const preloadedAssets = document.querySelector('#ar-preload-container a-assets');
