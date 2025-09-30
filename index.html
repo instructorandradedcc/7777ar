@@ -2,14 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <!-- CORREGIDO: Se añade user-scalable=no para evitar el zoom accidental en móviles que puede interferir con la UI. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <!-- CORREGIDO: Título de la aplicación actualizado -->
     <title>ECOPIENSA AR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-    <!-- CORREGIDO: Versión de Three.js alineada con la de A-Frame para evitar conflictos. -->
+    <!-- Versión de Three.js alineada con la de A-Frame para evitar conflictos. -->
     <script type="importmap">
         {
             "imports": {
@@ -37,7 +37,6 @@
             padding: 0; margin: 0 !important; border-radius: 0;
             overflow: hidden;
         }
-        /* AÑADIDO: Asegura que la página activa ocupe toda la altura en modo AR */
         .app-container.ar-fullscreen .page.active {
             height: 100%;
         }
@@ -57,7 +56,8 @@
             height: 100%;
         }
         /* CORREGIDO: Reglas robustas para que el video/canvas de la cámara cubra toda la pantalla */
-        #ar-scene-container.ar-active video, #ar-scene-container.ar-active canvas {
+        #ar-scene-container.ar-active video, 
+        #ar-scene-container.ar-active canvas {
             object-fit: cover;
             position: absolute;
             top: 0;
@@ -111,7 +111,6 @@
 <body class="bg-gray-200 text-gray-800 font-sans">
     
     <div id="app" class="app-container container mx-auto p-6 md:p-8 max-w-5xl bg-white rounded-xl shadow-lg my-8 overflow-y-auto" style="max-height: 85vh;">
-        <!-- CORREGIDO: Se actualizó el logo, título y subtítulo para mayor consistencia visual -->
         <div class="flex justify-center items-center mb-6">
              <img src="https://raw.githubusercontent.com/instructorandradedcc/7777ar/main/asetss/logofundacion.jpg" alt="Logo ECOPIENSA" class="h-20 w-auto mr-4" onerror="this.onerror=null;this.src='https://placehold.co/120x80/e2e8f0/94a3b8?text=Logo';">
              <div>
@@ -222,7 +221,7 @@
                  <div id="ar-preload-container" class="hidden"></div>
                  <div id="ar-scene-container"></div>
                  <div id="scanning-ui" class="hidden">
-                    <p class="scan-text">Apunte al marcador</p>
+                     <p class="scan-text">Apunte al marcador</p>
                  </div>
                  <div id="ar-active-controls" class="hidden p-4 bg-black bg-opacity-50">
                      <div class="relative flex justify-center items-center gap-4 max-w-4xl mx-auto">
@@ -565,13 +564,12 @@
             arPreloadContainer.appendChild(tempScene);
         }
         
-        function setupAndStartAR(useAutoStart) {
+        function setupAndStartAR(shouldEnterFullscreen) {
             if (!state.areAssetsPreloaded) {
                 document.getElementById('ar-status-text').textContent = 'Error: Modelos 3D no listos.';
                 return;
             }
             
-            // AÑADIDO: Mostrar el preloader de la cámara
             const arPreloader = document.getElementById('ar-preloader');
             arPreloader.classList.remove('hidden');
 
@@ -581,7 +579,9 @@
             const sceneEl = document.createElement('a-scene');
             sceneEl.setAttribute('embedded', '');
             
-            const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; maxTrackables: 1; autoStart: ${useAutoStart}; uiLoading: no; uiError: no; uiScanning: no;`;
+            // CORREGIDO: Se cambia autoStart a 'false' para iniciar la cámara manualmente.
+            // Esto aumenta la estabilidad en móviles y evita que el navegador se colapse.
+            const mindARSettings = `imageTargetSrc: ${state.assets.map(a => a.markerDataUrl).join(';')}; maxTrackables: 1; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;`;
             
             sceneEl.setAttribute('mindar-image', mindARSettings);
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
@@ -615,32 +615,25 @@
                 sceneEl.appendChild(targetEl);
             });
 
-            if (!useAutoStart) {
-                sceneEl.addEventListener('loaded', () => {
-                    const startMindAR = () => {
-                        const mindarSystem = sceneEl.systems['mindar-image-system'];
-                        if (mindarSystem) {
-                            mindarSystem.start();
-                        } else {
-                            setTimeout(startMindAR, 100); 
-                        }
-                    };
-                    startMindAR();
-                });
-            }
+            // CORREGIDO: Se inicia el sistema AR manualmente después de que la escena de A-Frame se haya cargado.
+            // Esto se aplica tanto para PC como para móvil para garantizar un inicio consistente y estable.
+            sceneEl.addEventListener('loaded', () => {
+                const mindarSystem = sceneEl.systems['mindar-image-system'];
+                mindarSystem.start(); // Inicia la cámara y el reconocimiento.
+            });
 
             const scanningUI = document.getElementById('scanning-ui');
             sceneEl.addEventListener('arReady', () => {
                 scanningUI.classList.remove('hidden');
                 arPreloader.classList.add('hidden'); // Ocultar preloader cuando la cámara está lista
                 
-                // AÑADIDO: Forzar el reajuste del renderer de A-Frame.
-                // Esto soluciona el problema de desplazamiento en móviles después de que la cámara se inicia.
+                // CORREGIDO: Forzar el reajuste del tamaño del renderer de A-Frame.
+                // Esto soluciona el problema de la barra blanca en la parte inferior.
                 setTimeout(() => {
                     if (sceneEl.renderer) {
                         sceneEl.renderer.setSize(window.innerWidth, window.innerHeight);
                     }
-                }, 100); // Un pequeño retraso para asegurar que todo esté en el DOM
+                }, 100); 
             });
             sceneEl.addEventListener('targetFound', () => scanningUI.classList.add('hidden'));
             sceneEl.addEventListener('targetLost', () => scanningUI.classList.remove('hidden'));
@@ -651,13 +644,13 @@
             document.documentElement.classList.add('ar-active');
             document.body.classList.add('ar-active');
             appContainer.classList.add('ar-fullscreen');
-            appContainer.style.maxHeight = ''; // CORREGIDO: Limpiar el estilo en línea para permitir pantalla completa
+            appContainer.style.maxHeight = ''; // Limpiar el estilo en línea para permitir pantalla completa
             arSceneContainer.classList.add('ar-active');
             document.getElementById('ar-ui-container').classList.add('hidden');
             document.getElementById('ar-active-controls').classList.remove('hidden');
             state.isArActive = true;
             
-            if (useAutoStart) { 
+            if (shouldEnterFullscreen) { 
                 document.documentElement.requestFullscreen().catch(err => {
                     console.warn("No se pudo entrar en pantalla completa automáticamente.", err);
                 });
@@ -671,7 +664,9 @@
                 if(sceneEl.systems['mindar-image-system']) {
                      sceneEl.systems['mindar-image-system'].stop();
                 }
-                sceneEl.parentNode.removeChild(sceneEl);
+                if (sceneEl.parentNode) {
+                    sceneEl.parentNode.removeChild(sceneEl);
+                }
             }
             
             arSceneContainer.innerHTML = '';
@@ -682,7 +677,7 @@
             document.documentElement.classList.remove('ar-active');
             document.body.classList.remove('ar-active');
             appContainer.classList.remove('ar-fullscreen');
-            appContainer.style.maxHeight = '85vh'; // CORREGIDO: Restaurar el estilo en línea
+            appContainer.style.maxHeight = '85vh'; // Restaurar el estilo en línea
             document.getElementById('ar-ui-container').classList.remove('hidden');
             document.getElementById('ar-active-controls').classList.add('hidden');
             document.getElementById('scanning-ui').classList.add('hidden');
@@ -809,6 +804,17 @@
             });
         });
         
+        // AÑADIDO: Listener global para redimensionar el canvas de A-Frame si la ventana cambia de tamaño.
+        // Esto soluciona de forma definitiva la barra blanca en PC y mejora la respuesta en móviles al girar la pantalla.
+        window.addEventListener('resize', () => {
+            if (state.isArActive) {
+                const sceneEl = document.querySelector('#ar-scene-container a-scene');
+                if (sceneEl && sceneEl.renderer) {
+                    sceneEl.renderer.setSize(window.innerWidth, window.innerHeight);
+                }
+            }
+        });
+
         initializeApp();
     });
     </script>
