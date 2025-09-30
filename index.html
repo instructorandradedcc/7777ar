@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>EcoBookMagik</title>
-    <script src="https://cdn/tailwindcss.com"></script>
+    <!-- CORREGIDO: URL de Tailwind CSS reparada -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
@@ -19,11 +20,11 @@
     
     <style>
         /* Estilos generales y para el modo AR */
-        /* CORREGIDO: Asegura que el body ocupe toda la pantalla en modo AR */
-        body.ar-active { 
+        /* CORREGIDO: Asegura que html y body ocupen toda la pantalla en modo AR */
+        html.ar-active, body.ar-active { 
             overflow: hidden;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             margin: 0;
             padding: 0;
         }
@@ -46,13 +47,11 @@
         /* Asegura que el video de la cámara cubra toda la pantalla y cursor de mano */
         #ar-scene-container.ar-active video, #ar-scene-container.ar-active canvas {
             object-fit: cover;
-            width: 100% !important;
-            height: 100% !important;
             position: absolute;
             top: 0;
             left: 0;
-            min-width: 100%;
-            min-height: 100%;
+            width: 100vw !important; /* Usa viewport width */
+            height: 100vh !important; /* Usa viewport height */
             cursor: grab;
         }
         #ar-scene-container.ar-active canvas:active {
@@ -632,6 +631,8 @@
             
             arSceneContainer.appendChild(sceneEl);
 
+            // CORREGIDO: Añade clase al HTML y al BODY
+            document.documentElement.classList.add('ar-active');
             document.body.classList.add('ar-active');
             document.getElementById('app').classList.add('ar-fullscreen');
             arSceneContainer.classList.add('ar-active');
@@ -661,6 +662,8 @@
             document.getElementById('ar-preload-container').innerHTML = '';
             state.areAssetsPreloaded = false; // Forzar precarga la próxima vez
 
+            // CORREGIDO: Remueve clase del HTML y del BODY
+            document.documentElement.classList.remove('ar-active');
             document.body.classList.remove('ar-active');
             document.getElementById('app').classList.remove('ar-fullscreen');
             document.getElementById('ar-ui-container').classList.remove('hidden');
